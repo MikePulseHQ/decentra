@@ -10,12 +10,14 @@ import sys
 import websockets
 from datetime import datetime
 import os
+import getpass
 
 
 class ChatClient:
-    def __init__(self, server_url, username):
+    def __init__(self, server_url, username, password):
         self.server_url = server_url
         self.username = username
+        self.password = password
         self.websocket = None
         self.running = False
     
@@ -39,6 +41,9 @@ class ChatClient:
                 elif data['type'] == 'system':
                     timestamp = datetime.fromisoformat(data['timestamp']).strftime('%H:%M:%S')
                     print(f"\n\033[90m[{timestamp}] {data['content']}\033[0m")
+                    print(f"{self.username}> ", end='', flush=True)
+                elif data['type'] == 'invite_code':
+                    print(f"\n\033[93m{data['message']}\033[0m")
                     print(f"{self.username}> ", end='', flush=True)
                     
         except websockets.exceptions.ConnectionClosed:
@@ -84,6 +89,14 @@ class ChatClient:
                     self.running = False
                     break
                 
+                # Handle invite command
+                if message.lower() == '/invite':
+                    invite_data = json.dumps({
+                        'type': 'generate_invite'
+                    })
+                    await self.websocket.send(invite_data)
+                    continue
+                
                 # Send message to server
                 msg_data = json.dumps({
                     'type': 'message',
@@ -95,6 +108,52 @@ class ChatClient:
             print(f"\nError sending messages: {e}")
             self.running = False
     
+    async def authenticate(self):
+        """Authenticate with the server (login or signup)."""
+        try:
+            # Ask for authentication mode
+            print("\n1. Login")
+            print("2. Sign up")
+            choice = input("Choose an option (1/2): ").strip()
+            
+            if choice == '2':
+                # Sign up
+                invite_code = input("Enter invite code (leave empty if first user): ").strip()
+                
+                auth_data = json.dumps({
+                    'type': 'signup',
+                    'username': self.username,
+                    'password': self.password,
+                    'invite_code': invite_code
+                })
+                await self.websocket.send(auth_data)
+            else:
+                # Login
+                auth_data = json.dumps({
+                    'type': 'login',
+                    'username': self.username,
+                    'password': self.password
+                })
+                await self.websocket.send(auth_data)
+            
+            # Wait for authentication response
+            response = await self.websocket.recv()
+            response_data = json.loads(response)
+            
+            if response_data.get('type') == 'auth_success':
+                print(f"\n{response_data.get('message')}")
+                return True
+            elif response_data.get('type') == 'auth_error':
+                print(f"\nAuthentication failed: {response_data.get('message')}")
+                return False
+            else:
+                print("\nUnexpected response from server")
+                return False
+                
+        except Exception as e:
+            print(f"\nAuthentication error: {e}")
+            return False
+    
     async def connect(self):
         """Connect to the chat server and start messaging."""
         try:
@@ -103,15 +162,14 @@ class ChatClient:
                 self.websocket = websocket
                 self.running = True
                 
-                # Send join message
-                join_data = json.dumps({
-                    'type': 'join',
-                    'username': self.username
-                })
-                await websocket.send(join_data)
+                # Authenticate
+                if not await self.authenticate():
+                    print("Authentication failed. Exiting.")
+                    return
                 
                 print(f"Connected as {self.username}")
                 print("Type your message and press Enter to send.")
+                print("Type /invite to generate an invite code.")
                 print("Type /quit to exit.\n")
                 
                 # Run receive and send concurrently
@@ -136,18 +194,25 @@ async def main():
     server_port = os.environ.get('SERVER_PORT', '8765')
     server_url = f"ws://{server_host}:{server_port}"
     
+    print("\nDecentra Chat Client")
+    print("=" * 50)
+    
     # Get username from command line or prompt
     if len(sys.argv) > 1:
         username = sys.argv[1]
     else:
         username = input("Enter your username: ").strip()
         if not username:
-            username = "Anonymous"
+            print("Username cannot be empty")
+            sys.exit(1)
     
-    print("\nDecentra Chat Client")
-    print("=" * 50)
+    # Get password (always prompt for security)
+    password = getpass.getpass("Enter your password: ")
+    if not password:
+        print("Password cannot be empty")
+        sys.exit(1)
     
-    client = ChatClient(server_url, username)
+    client = ChatClient(server_url, username, password)
     await client.connect()
 
 
