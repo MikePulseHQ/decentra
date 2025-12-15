@@ -30,9 +30,9 @@ fi
 
 # Test server startup (with timeout)
 echo "Testing server startup..."
-timeout 3 python3 server/server.py &> /tmp/server_test.log &
+timeout 5 python3 server/server.py &> /tmp/server_test.log &
 SERVER_PID=$!
-sleep 2
+sleep 3
 
 if ps -p $SERVER_PID > /dev/null; then
     echo "✓ Server starts successfully"
