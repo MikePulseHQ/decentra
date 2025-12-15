@@ -27,7 +27,7 @@ async def broadcast(message, exclude=None):
             await asyncio.gather(*tasks, return_exceptions=True)
 
 
-async def handler(websocket, path):
+async def handler(websocket):
     """Handle client connections."""
     username = None
     
