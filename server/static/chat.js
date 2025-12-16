@@ -279,9 +279,13 @@
         if (!server) return;
         
         // Update UI
-        document.querySelectorAll('.server-item').forEach(item => item.classList.remove('active'));
+        document.querySelectorAll('.server-item').forEach(item => {
+            item.classList.remove('active');
+            if (item.textContent === server.name) {
+                item.classList.add('active');
+            }
+        });
         document.querySelectorAll('.dm-item').forEach(item => item.classList.remove('active'));
-        event.target.classList.add('active');
         
         // Show channels view
         channelsView.classList.remove('hidden');
@@ -309,8 +313,12 @@
         currentContext = { type: 'server', serverId, channelId };
         
         // Update UI
-        document.querySelectorAll('.channel-item').forEach(item => item.classList.remove('active'));
-        event.target.classList.add('active');
+        document.querySelectorAll('.channel-item').forEach(item => {
+            item.classList.remove('active');
+            if (item.textContent === '# ' + channelName) {
+                item.classList.add('active');
+            }
+        });
         
         const server = servers.find(s => s.id === serverId);
         chatTitle.textContent = `${server.name} - # ${channelName}`;
@@ -337,8 +345,12 @@
         
         // Update UI
         document.querySelectorAll('.server-item').forEach(item => item.classList.remove('active'));
-        document.querySelectorAll('.dm-item').forEach(item => item.classList.remove('active'));
-        event.target.classList.add('active');
+        document.querySelectorAll('.dm-item').forEach(item => {
+            item.classList.remove('active');
+            if (item.textContent === dm.username) {
+                item.classList.add('active');
+            }
+        });
         
         channelsView.classList.add('hidden');
         friendsView.classList.add('hidden');
