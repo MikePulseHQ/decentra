@@ -188,7 +188,11 @@ class VoiceChat {
                 
                 // Handle stream ended (user clicked stop sharing in browser UI)
                 this.localScreenStream.getVideoTracks()[0].onended = () => {
-                    this.toggleScreenShare();
+                    // Stop screen sharing when user stops from browser UI
+                    if (this.isScreenSharing) {
+                        // Use a separate cleanup to avoid recursion issues
+                        this.stopScreenSharing();
+                    }
                 };
                 
                 this.isScreenSharing = true;
@@ -257,6 +261,40 @@ class VoiceChat {
             
             return false;
         }
+    }
+    
+    stopScreenSharing() {
+        // Helper method to cleanly stop screen sharing without toggling
+        if (this.localScreenStream) {
+            this.localScreenStream.getTracks().forEach(track => track.stop());
+            
+            // Restore video track or remove screen track from all peer connections
+            this.peerConnections.forEach(pc => {
+                const senders = pc.getSenders();
+                const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                
+                if (videoSender) {
+                    if (this.isVideoEnabled && this.localVideoStream) {
+                        // Restore camera video
+                        const videoTrack = this.localVideoStream.getVideoTracks()[0];
+                        videoSender.replaceTrack(videoTrack);
+                    } else {
+                        // Remove video track
+                        pc.removeTrack(videoSender);
+                    }
+                }
+            });
+            
+            this.localScreenStream = null;
+        }
+        
+        this.isScreenSharing = false;
+        
+        // Notify server
+        this.ws.send(JSON.stringify({
+            type: 'voice_screen_share',
+            screen_sharing: false
+        }));
     }
     
     async joinVoiceChannel(serverId, channelId) {

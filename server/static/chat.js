@@ -1366,7 +1366,7 @@
         devices.microphones.forEach(device => {
             const option = document.createElement('option');
             option.value = device.deviceId;
-            option.textContent = device.label || `Microphone ${device.deviceId.substr(0, 8)}`;
+            option.textContent = device.label || `Microphone ${device.deviceId.substring(0, 8)}`;
             if (device.deviceId === voiceChat.selectedMicrophoneId) {
                 option.selected = true;
             }
@@ -1377,7 +1377,7 @@
         devices.speakers.forEach(device => {
             const option = document.createElement('option');
             option.value = device.deviceId;
-            option.textContent = device.label || `Speaker ${device.deviceId.substr(0, 8)}`;
+            option.textContent = device.label || `Speaker ${device.deviceId.substring(0, 8)}`;
             if (device.deviceId === voiceChat.selectedSpeakerId) {
                 option.selected = true;
             }
