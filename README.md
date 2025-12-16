@@ -8,6 +8,11 @@ A decentralized Discord-like chat server and client that is non-federated and se
 - 🖥️ **Servers** - Create and manage multiple servers with channels
 - 💬 **Direct Messages** - Private conversations with friends
 - 👥 **Friend System** - Search for users and add friends
+- 🎤 **Voice Chat** - Direct voice calls and voice channels in servers
+  - 📞 Call friends directly from DMs or friends list
+  - 🔊 Join voice channels in servers for group voice chat
+  - 🔇 Mute/unmute controls
+  - 🌐 Peer-to-peer WebRTC connections for high-quality audio
 - 🔐 Username/password authentication
 - 🎟️ Invite code system for controlled access
 - 📜 Message history (last 100 messages per channel/DM)
@@ -77,17 +82,20 @@ Then open your browser to `http://localhost:8765`
 
 - **server.py**: Combined HTTP and WebSocket server that handles:
   - User authentication and management
-  - Server and channel creation
+  - Server and channel creation (text and voice channels)
   - Friend system and user search
   - Direct messaging
   - Message routing to appropriate contexts
   - Real-time WebSocket communication
+  - WebRTC signaling for voice chat connections
+  - Voice state management
 - **static/**: Web client files (HTML, CSS, JavaScript)
   - **index.html**: Login and signup page
-  - **chat.html**: Main chat interface with servers, channels, DMs, and friends
+  - **chat.html**: Main chat interface with servers, channels, DMs, friends, and voice controls
   - **styles.css**: Application styling with Discord-like layout
   - **auth.js**: Authentication logic
   - **chat.js**: Chat functionality, WebSocket client, and UI management
+  - **voice.js**: WebRTC voice chat implementation and peer connection management
 - **Dockerfile**: Container configuration for the server
 - **requirements.txt**: Python dependencies (websockets, bcrypt, aiohttp)
 
@@ -130,6 +138,31 @@ The server runs on port 8765 by default and serves both HTTP and WebSocket conne
 - Once you've added friends, click the **DM** button next to a friend's name
 - Start a private conversation that only you and your friend can see
 - All your DMs appear in the left sidebar under "Direct Messages"
+
+#### Voice Chat
+
+##### Direct Voice Calls
+- Click the **📞 button** next to a friend's name in the friends list or DMs
+- Your friend will receive an incoming call notification
+- They can accept or reject the call
+- During a call, use the mute button (🎤) to mute/unmute your microphone
+- Click "Leave Voice" to end the call
+
+##### Voice Channels in Servers
+- Server owners can create voice channels in their servers:
+  1. Select a server
+  2. Click the **⚙ menu button** (bottom left)
+  3. Select **Create Voice Channel**
+  4. Enter a name for the voice channel
+- Voice channels appear with a 🔊 speaker icon
+- Click on a voice channel to join it
+- See how many users are currently in the channel (displayed next to channel name)
+- Use the voice controls at the bottom to:
+  - Mute/unmute your microphone
+  - Leave the voice channel
+- All users in the same voice channel can hear each other
+
+**Note**: Voice chat uses WebRTC for peer-to-peer connections. Make sure your browser has microphone permissions enabled.
 
 ### Message Display
 
