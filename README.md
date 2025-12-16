@@ -6,6 +6,9 @@ A decentralized Discord-like chat server and client that is non-federated and se
 
 - 🚀 Real-time WebSocket-based messaging
 - 🖥️ **Servers** - Create and manage multiple servers with channels
+  - ⚙️ Server settings for owners (rename, invites, permissions)
+  - 🎫 Server-specific invite codes
+  - 🔐 Granular user permissions (create/edit/delete channels)
 - 💬 **Direct Messages** - Private conversations with friends
 - 👥 **Friend System** - Search for users and add friends
 - 🎤 **Voice Chat** - Direct voice calls and voice channels in servers
@@ -128,6 +131,28 @@ The server runs on port 8765 by default and serves both HTTP and WebSocket conne
 - Click on any server to view its channels
 - Send messages in server channels to communicate with all members
 
+##### Server Settings (Owner Only)
+Server owners can access settings by clicking the **⚙ button** next to the server name:
+
+**General Settings:**
+- Rename the server at any time
+- Changes are visible to all server members immediately
+
+**Server Invites:**
+- Generate invite codes specific to your server
+- Share invite codes with others to let them join
+- Each invite code can only be used once
+- New members join with no special permissions by default
+
+**User Permissions:**
+- Manage what each member can do in your server
+- Available permissions:
+  - **Create Channel**: Allow users to create new text/voice channels
+  - **Edit Channel**: Allow users to modify channel settings
+  - **Delete Channel**: Allow users to remove channels
+- Server owners always have all permissions
+- Toggle permissions on/off for each member individually
+
 #### Friends
 - Click the **Friends** button in the header to view your friends list
 - Click **Search Users** to find other users by username
@@ -149,7 +174,7 @@ The server runs on port 8765 by default and serves both HTTP and WebSocket conne
 - Click "Leave Voice" to end the call
 
 ##### Voice Channels in Servers
-- Server owners can create voice channels in their servers:
+- Users with "Create Channel" permission can create voice channels:
   1. Select a server
   2. Click the **⚙ menu button** (bottom left)
   3. Select **Create Voice Channel**

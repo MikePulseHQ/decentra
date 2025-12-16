@@ -74,6 +74,16 @@
     const searchResults = document.getElementById('search-results');
     const closeSearchModalBtn = document.getElementById('close-search-modal');
     
+    const serverSettingsModal = document.getElementById('server-settings-modal');
+    const serverSettingsBtn = document.getElementById('server-settings-btn');
+    const closeServerSettingsModalBtn = document.getElementById('close-server-settings-modal');
+    const renameServerForm = document.getElementById('rename-server-form');
+    const newServerNameInput = document.getElementById('new-server-name-input');
+    const generateServerInviteBtn = document.getElementById('generate-server-invite-btn');
+    const serverInviteDisplay = document.getElementById('server-invite-display');
+    const serverInviteCodeText = document.getElementById('server-invite-code-text');
+    const serverMembersList = document.getElementById('server-members-list');
+    
     // Voice elements
     const voiceControls = document.getElementById('voice-controls');
     const voiceStatusText = document.getElementById('voice-status-text');
@@ -231,6 +241,57 @@
                 
             case 'invite_code':
                 showInviteModal(data.code);
+                break;
+                
+            // Server settings messages
+            case 'server_renamed':
+                const renamedServer = servers.find(s => s.id === data.server_id);
+                if (renamedServer) {
+                    renamedServer.name = data.name;
+                    updateServersList();
+                    if (currentlySelectedServer === data.server_id) {
+                        serverNameDisplay.textContent = data.name;
+                    }
+                }
+                break;
+                
+            case 'server_invite_code':
+                showServerInviteCode(data.code);
+                break;
+                
+            case 'server_members':
+                displayServerMembers(data.members, data.server_id);
+                break;
+                
+            case 'permissions_updated':
+                const serverWithUpdatedPerms = servers.find(s => s.id === data.server_id);
+                if (serverWithUpdatedPerms) {
+                    serverWithUpdatedPerms.permissions = data.permissions;
+                }
+                break;
+                
+            case 'permissions_updated_success':
+                // Refresh member list if settings modal is open
+                if (!serverSettingsModal.classList.contains('hidden')) {
+                    ws.send(JSON.stringify({
+                        type: 'get_server_members',
+                        server_id: currentlySelectedServer
+                    }));
+                }
+                break;
+                
+            case 'member_joined':
+                // Refresh member list if settings modal is open
+                if (!serverSettingsModal.classList.contains('hidden') && currentlySelectedServer === data.server_id) {
+                    ws.send(JSON.stringify({
+                        type: 'get_server_members',
+                        server_id: currentlySelectedServer
+                    }));
+                }
+                break;
+                
+            case 'error':
+                alert(data.message);
                 break;
                 
             // Voice chat messages
@@ -397,6 +458,14 @@
         friendsView.classList.add('hidden');
         
         serverNameDisplay.textContent = server.name;
+        
+        // Show/hide settings button based on ownership
+        if (server.owner === username) {
+            serverSettingsBtn.classList.remove('hidden');
+        } else {
+            serverSettingsBtn.classList.add('hidden');
+        }
+        
         updateChannelsForServer(serverId);
         
         // Auto-select first text channel
@@ -623,8 +692,14 @@
         }
         
         const server = servers.find(s => s.id === currentlySelectedServer);
-        if (!server || server.owner !== username) {
-            alert('Only server owners can create voice channels');
+        if (!server) return;
+        
+        // Check if user has permission (owner or has can_create_channel permission)
+        const hasPermission = server.owner === username || 
+                            (server.permissions && server.permissions.can_create_channel);
+        
+        if (!hasPermission) {
+            alert('You do not have permission to create channels');
             return;
         }
         
@@ -693,6 +768,179 @@
         searchUsersInput.value = '';
         searchResults.innerHTML = '';
     });
+    
+    // Server settings
+    serverSettingsBtn.addEventListener('click', () => {
+        if (!currentlySelectedServer) return;
+        
+        const server = servers.find(s => s.id === currentlySelectedServer);
+        if (!server || server.owner !== username) return;
+        
+        serverSettingsModal.classList.remove('hidden');
+        newServerNameInput.value = server.name;
+        serverInviteDisplay.classList.add('hidden');
+        
+        // Switch to general tab
+        switchSettingsTab('general');
+        
+        // Load server members
+        ws.send(JSON.stringify({
+            type: 'get_server_members',
+            server_id: currentlySelectedServer
+        }));
+    });
+    
+    closeServerSettingsModalBtn.addEventListener('click', () => {
+        serverSettingsModal.classList.add('hidden');
+    });
+    
+    // Settings tabs
+    document.querySelectorAll('.settings-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.tab;
+            switchSettingsTab(tabName);
+        });
+    });
+    
+    function switchSettingsTab(tabName) {
+        // Update tab buttons
+        document.querySelectorAll('.settings-tab').forEach(t => {
+            t.classList.toggle('active', t.dataset.tab === tabName);
+        });
+        
+        // Update tab content
+        document.querySelectorAll('.settings-tab-content').forEach(content => {
+            content.classList.add('hidden');
+        });
+        document.getElementById(`settings-tab-${tabName}`).classList.remove('hidden');
+    }
+    
+    // Rename server
+    renameServerForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const newName = newServerNameInput.value.trim();
+        if (!newName || !currentlySelectedServer) return;
+        
+        ws.send(JSON.stringify({
+            type: 'rename_server',
+            server_id: currentlySelectedServer,
+            name: newName
+        }));
+        
+        serverSettingsModal.classList.add('hidden');
+    });
+    
+    // Generate server invite
+    generateServerInviteBtn.addEventListener('click', () => {
+        if (!currentlySelectedServer) return;
+        
+        ws.send(JSON.stringify({
+            type: 'generate_server_invite',
+            server_id: currentlySelectedServer
+        }));
+    });
+    
+    function showServerInviteCode(code) {
+        serverInviteCodeText.textContent = code;
+        serverInviteDisplay.classList.remove('hidden');
+    }
+    
+    function displayServerMembers(members, serverId) {
+        serverMembersList.innerHTML = '';
+        
+        members.forEach(member => {
+            const memberItem = document.createElement('div');
+            memberItem.className = 'member-item';
+            
+            const memberInfo = document.createElement('div');
+            memberInfo.className = 'member-info';
+            
+            const memberName = document.createElement('span');
+            memberName.className = 'member-name';
+            memberName.textContent = member.username;
+            memberInfo.appendChild(memberName);
+            
+            if (member.is_owner) {
+                const ownerBadge = document.createElement('span');
+                ownerBadge.className = 'owner-badge';
+                ownerBadge.textContent = 'Owner';
+                memberInfo.appendChild(ownerBadge);
+            }
+            
+            memberItem.appendChild(memberInfo);
+            
+            // Add permission toggles for non-owners
+            if (!member.is_owner) {
+                const permsDiv = document.createElement('div');
+                permsDiv.className = 'member-permissions';
+                
+                const permissions = ['can_create_channel', 'can_edit_channel', 'can_delete_channel'];
+                const permLabels = {
+                    'can_create_channel': 'Create',
+                    'can_edit_channel': 'Edit',
+                    'can_delete_channel': 'Delete'
+                };
+                
+                permissions.forEach(perm => {
+                    const permToggle = document.createElement('div');
+                    permToggle.className = 'permission-toggle';
+                    
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.checked = member.permissions && member.permissions[perm];
+                    checkbox.dataset.permission = perm;  // Add data attribute for permission type
+                    checkbox.onchange = () => {
+                        updatePermission(serverId, member.username, perm, checkbox.checked);
+                    };
+                    
+                    const label = document.createElement('label');
+                    label.textContent = permLabels[perm];
+                    
+                    permToggle.appendChild(checkbox);
+                    permToggle.appendChild(label);
+                    permsDiv.appendChild(permToggle);
+                });
+                
+                memberItem.appendChild(permsDiv);
+            }
+            
+            serverMembersList.appendChild(memberItem);
+        });
+    }
+    
+    function updatePermission(serverId, targetUsername, permission, value) {
+        const server = servers.find(s => s.id === serverId);
+        if (!server) return;
+        
+        // Get current permissions by reading from checkboxes using data attributes
+        const currentPerms = {
+            can_create_channel: false,
+            can_edit_channel: false,
+            can_delete_channel: false
+        };
+        
+        // Find the member's row and read all checkboxes
+        document.querySelectorAll('.member-item').forEach(item => {
+            const name = item.querySelector('.member-name').textContent;
+            if (name === targetUsername) {
+                const checkboxes = item.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(cb => {
+                    const perm = cb.dataset.permission;
+                    if (perm) {
+                        currentPerms[perm] = cb.checked;
+                    }
+                });
+            }
+        });
+        
+        ws.send(JSON.stringify({
+            type: 'update_user_permissions',
+            server_id: serverId,
+            username: targetUsername,
+            permissions: currentPerms
+        }));
+    }
     
     // Display search results
     function displaySearchResults(results) {
