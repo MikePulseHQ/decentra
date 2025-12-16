@@ -26,7 +26,7 @@ users = {}
 # Store active invite codes: {code: creator_username}
 invite_codes = {}
 
-# Store servers: {server_id: {name, owner, members: set(), channels: {channel_id: {name, type: 'text'|'voice', messages: [], voice_members: set()}}}}
+# Store servers: {server_id: {name, owner, members: set(), permissions: {username: {can_create_channel, can_edit_channel, can_delete_channel}}, invite_codes: {code: creator}, channels: {channel_id: {name, type: 'text'|'voice', messages: [], voice_members: set()}}}}
 servers = {}
 # Store direct messages: {dm_id: {participants: set(), messages: []}}
 direct_messages = {}
@@ -97,6 +97,29 @@ def get_or_create_dm(user1, user2):
         'messages': []
     }
     return dm_id
+
+
+def has_permission(server_id, username, permission):
+    """Check if user has specific permission in a server.
+    Owner always has all permissions.
+    Permission can be: 'can_create_channel', 'can_edit_channel', 'can_delete_channel'
+    """
+    if server_id not in servers:
+        return False
+    
+    server = servers[server_id]
+    
+    # Owner has all permissions
+    if server['owner'] == username:
+        return True
+    
+    # Check user's specific permissions
+    if username in server.get('permissions', {}):
+        return server['permissions'][username].get(permission, False)
+    
+    # Default: no permission
+    return False
+
 
 
 async def broadcast(message, exclude=None):
@@ -244,7 +267,7 @@ async def handler(websocket):
         user_servers = []
         for server_id, server_data in servers.items():
             if username in server_data['members']:
-                user_servers.append({
+                server_info = {
                     'id': server_id,
                     'name': server_data['name'],
                     'owner': server_data['owner'],
@@ -252,7 +275,15 @@ async def handler(websocket):
                         {'id': ch_id, 'name': ch_data['name'], 'type': ch_data.get('type', 'text')}
                         for ch_id, ch_data in server_data['channels'].items()
                     ]
-                })
+                }
+                # Add permissions if user is not owner
+                if username != server_data['owner']:
+                    server_info['permissions'] = server_data.get('permissions', {}).get(username, {
+                        'can_create_channel': False,
+                        'can_edit_channel': False,
+                        'can_delete_channel': False
+                    })
+                user_servers.append(server_info)
         
         user_dms = []
         for dm_id, dm_data in direct_messages.items():
@@ -358,6 +389,8 @@ async def handler(websocket):
                                 'name': server_name,
                                 'owner': username,
                                 'members': {username},
+                                'permissions': {},  # Permissions for non-owners
+                                'invite_codes': {},  # Server-specific invite codes
                                 'channels': {
                                     channel_id: {
                                         'name': 'general',
@@ -506,13 +539,174 @@ async def handler(websocket):
                         }))
                         print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} generated invite code: {invite_code}")
                     
+                    # Server settings handlers
+                    elif data.get('type') == 'rename_server':
+                        server_id = data.get('server_id', '')
+                        new_name = data.get('name', '').strip()
+                        
+                        if server_id in servers and new_name:
+                            if username == servers[server_id]['owner']:
+                                old_name = servers[server_id]['name']
+                                servers[server_id]['name'] = new_name
+                                
+                                # Notify all server members
+                                await broadcast_to_server(server_id, json.dumps({
+                                    'type': 'server_renamed',
+                                    'server_id': server_id,
+                                    'name': new_name
+                                }))
+                                print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} renamed server {old_name} to {new_name}")
+                            else:
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': 'Only the server owner can rename the server'
+                                }))
+                    
+                    elif data.get('type') == 'generate_server_invite':
+                        server_id = data.get('server_id', '')
+                        
+                        if server_id in servers:
+                            if username in servers[server_id]['members']:
+                                invite_code = generate_invite_code()
+                                servers[server_id]['invite_codes'][invite_code] = username
+                                
+                                await websocket.send_str(json.dumps({
+                                    'type': 'server_invite_code',
+                                    'server_id': server_id,
+                                    'code': invite_code,
+                                    'message': f'Server invite code generated: {invite_code}'
+                                }))
+                                print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} generated invite for server {server_id}: {invite_code}")
+                    
+                    elif data.get('type') == 'join_server_with_invite':
+                        invite_code = data.get('invite_code', '').strip()
+                        
+                        # Find server with this invite code
+                        for server_id, server_data in servers.items():
+                            if invite_code in server_data.get('invite_codes', {}):
+                                if username not in server_data['members']:
+                                    server_data['members'].add(username)
+                                    
+                                    # Initialize default permissions (none)
+                                    if 'permissions' not in server_data:
+                                        server_data['permissions'] = {}
+                                    server_data['permissions'][username] = {
+                                        'can_create_channel': False,
+                                        'can_edit_channel': False,
+                                        'can_delete_channel': False
+                                    }
+                                    
+                                    # Remove used invite code
+                                    del server_data['invite_codes'][invite_code]
+                                    
+                                    await websocket.send_str(json.dumps({
+                                        'type': 'server_joined',
+                                        'server': {
+                                            'id': server_id,
+                                            'name': server_data['name'],
+                                            'owner': server_data['owner'],
+                                            'channels': [
+                                                {'id': ch_id, 'name': ch_data['name'], 'type': ch_data.get('type', 'text')}
+                                                for ch_id, ch_data in server_data['channels'].items()
+                                            ]
+                                        }
+                                    }))
+                                    
+                                    # Notify other server members
+                                    await broadcast_to_server(server_id, json.dumps({
+                                        'type': 'member_joined',
+                                        'server_id': server_id,
+                                        'username': username
+                                    }), exclude=websocket)
+                                    print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} joined server {server_id} via invite")
+                                    break
+                                else:
+                                    await websocket.send_str(json.dumps({
+                                        'type': 'error',
+                                        'message': 'You are already a member of this server'
+                                    }))
+                                    break
+                        else:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'Invalid server invite code'
+                            }))
+                    
+                    elif data.get('type') == 'update_user_permissions':
+                        server_id = data.get('server_id', '')
+                        target_username = data.get('username', '')
+                        permissions = data.get('permissions', {})
+                        
+                        if server_id in servers and target_username:
+                            if username == servers[server_id]['owner']:
+                                if target_username in servers[server_id]['members'] and target_username != servers[server_id]['owner']:
+                                    # Update permissions
+                                    if 'permissions' not in servers[server_id]:
+                                        servers[server_id]['permissions'] = {}
+                                    servers[server_id]['permissions'][target_username] = {
+                                        'can_create_channel': permissions.get('can_create_channel', False),
+                                        'can_edit_channel': permissions.get('can_edit_channel', False),
+                                        'can_delete_channel': permissions.get('can_delete_channel', False)
+                                    }
+                                    
+                                    # Notify the user whose permissions were updated
+                                    await send_to_user(target_username, json.dumps({
+                                        'type': 'permissions_updated',
+                                        'server_id': server_id,
+                                        'permissions': servers[server_id]['permissions'][target_username]
+                                    }))
+                                    
+                                    # Confirm to the owner
+                                    await websocket.send_str(json.dumps({
+                                        'type': 'permissions_updated_success',
+                                        'server_id': server_id,
+                                        'username': target_username,
+                                        'permissions': servers[server_id]['permissions'][target_username]
+                                    }))
+                                    print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} updated permissions for {target_username} in server {server_id}")
+                                else:
+                                    await websocket.send_str(json.dumps({
+                                        'type': 'error',
+                                        'message': 'Cannot update permissions for this user'
+                                    }))
+                            else:
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': 'Only the server owner can update permissions'
+                                }))
+                    
+                    elif data.get('type') == 'get_server_members':
+                        server_id = data.get('server_id', '')
+                        
+                        if server_id in servers:
+                            if username in servers[server_id]['members']:
+                                members = []
+                                for member in servers[server_id]['members']:
+                                    member_data = {
+                                        'username': member,
+                                        'is_owner': member == servers[server_id]['owner']
+                                    }
+                                    if member != servers[server_id]['owner']:
+                                        member_data['permissions'] = servers[server_id].get('permissions', {}).get(member, {
+                                            'can_create_channel': False,
+                                            'can_edit_channel': False,
+                                            'can_delete_channel': False
+                                        })
+                                    members.append(member_data)
+                                
+                                await websocket.send_str(json.dumps({
+                                    'type': 'server_members',
+                                    'server_id': server_id,
+                                    'members': members
+                                }))
+                    
                     # Voice chat handlers
                     elif data.get('type') == 'create_voice_channel':
                         server_id = data.get('server_id', '')
                         channel_name = data.get('name', '').strip()
                         
                         if server_id in servers and channel_name:
-                            if username == servers[server_id]['owner']:
+                            if has_permission(server_id, username, 'can_create_channel'):
                                 channel_id = get_next_channel_id()
                                 servers[server_id]['channels'][channel_id] = {
                                     'name': channel_name,
@@ -529,6 +723,11 @@ async def handler(websocket):
                                 })
                                 await broadcast_to_server(server_id, channel_info)
                                 print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} created voice channel: {channel_name}")
+                            else:
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': 'You do not have permission to create channels'
+                                }))
                     
                     elif data.get('type') == 'join_voice_channel':
                         server_id = data.get('server_id', '')
