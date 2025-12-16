@@ -51,6 +51,7 @@
             <div id="channels-view" class="sidebar-view">
                 <div class="sidebar-header">
                     <h3 id="server-name">Select a Server</h3>
+                    <button id="server-settings-btn" class="btn btn-small btn-icon hidden" title="Server Settings">⚙</button>
                 </div>
                 <div id="channels-list" class="items-list">
                     <!-- Channel items will be added here -->
@@ -170,6 +171,49 @@
                 <!-- Search results will be added here -->
             </div>
             <button id="close-search-modal" class="btn btn-secondary">Close</button>
+        </div>
+    </div>
+    
+    <div id="server-settings-modal" class="modal hidden">
+        <div class="modal-content modal-content-large">
+            <h3>Server Settings</h3>
+            <div class="settings-tabs">
+                <button class="settings-tab active" data-tab="general">General</button>
+                <button class="settings-tab" data-tab="invites">Invites</button>
+                <button class="settings-tab" data-tab="permissions">Permissions</button>
+            </div>
+            
+            <div id="settings-tab-general" class="settings-tab-content">
+                <h4>Server Name</h4>
+                <form id="rename-server-form">
+                    <div class="form-group">
+                        <label for="new-server-name-input">New Server Name</label>
+                        <input type="text" id="new-server-name-input" required>
+                    </div>
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-primary">Rename Server</button>
+                    </div>
+                </form>
+            </div>
+            
+            <div id="settings-tab-invites" class="settings-tab-content hidden">
+                <h4>Server Invites</h4>
+                <p>Generate invite codes to invite others to this server.</p>
+                <button id="generate-server-invite-btn" class="btn btn-primary">Generate Invite Code</button>
+                <div id="server-invite-display" class="invite-code-display hidden">
+                    <code id="server-invite-code-text"></code>
+                </div>
+            </div>
+            
+            <div id="settings-tab-permissions" class="settings-tab-content hidden">
+                <h4>User Permissions</h4>
+                <p>Manage what each user can do in this server.</p>
+                <div id="server-members-list" class="members-list">
+                    <!-- Members will be populated here -->
+                </div>
+            </div>
+            
+            <button id="close-server-settings-modal" class="btn btn-secondary">Close</button>
         </div>
     </div>
     
