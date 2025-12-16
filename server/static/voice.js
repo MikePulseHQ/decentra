@@ -29,7 +29,13 @@ class VoiceChat {
             return true;
         } catch (error) {
             console.error('Error accessing microphone:', error);
-            alert('Cannot access microphone. Please check your permissions.');
+            if (error.name === 'NotAllowedError') {
+                alert('Microphone access denied. Please grant permission in your browser settings.');
+            } else if (error.name === 'NotFoundError') {
+                alert('No microphone found. Please connect a microphone and try again.');
+            } else {
+                alert('Cannot access microphone. Please check your permissions and device.');
+            }
             return false;
         }
     }
@@ -155,7 +161,12 @@ class VoiceChat {
             console.log('Received remote track from', targetUsername);
             const remoteAudio = new Audio();
             remoteAudio.srcObject = event.streams[0];
-            remoteAudio.play();
+            
+            // Handle play promise to avoid unhandled rejection
+            remoteAudio.play().catch(error => {
+                console.warn('Audio autoplay failed:', error);
+                // Audio will play when user interacts with the page
+            });
             
             // Store audio element for later control
             pc.remoteAudio = remoteAudio;
@@ -210,6 +221,10 @@ class VoiceChat {
         let pc = this.peerConnections.get(fromUsername);
         if (!pc) {
             pc = await this.createPeerConnection(fromUsername, false);
+        } else if (pc.signalingState === 'have-local-offer') {
+            // Handle glare condition: both peers sent offers simultaneously
+            console.log('Glare detected with', fromUsername, '- ignoring offer');
+            return;
         }
         
         try {

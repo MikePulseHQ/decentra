@@ -814,11 +814,14 @@
         voiceChat.joinVoiceChannel(serverId, channelId);
         showVoiceControls(`Voice: ${channelName}`);
         
-        // Update UI
-        chatTitle.textContent = `🔊 ${channelName}`;
-        messagesContainer.innerHTML = '<div class="welcome-message"><h2>Voice Channel</h2><p>You are now in the voice channel. Use the controls below to manage your audio.</p></div>';
-        messageInput.disabled = true;
-        submitBtn.disabled = true;
+        // Update UI - keep current text channel selected if available
+        const server = servers.find(s => s.id === serverId);
+        if (server) {
+            const firstTextChannel = server.channels.find(ch => ch.type === 'text');
+            if (firstTextChannel && (!currentContext || currentContext.type !== 'server' || currentContext.serverId !== serverId)) {
+                selectChannel(serverId, firstTextChannel.id, firstTextChannel.name, firstTextChannel.type);
+            }
+        }
     }
     
     function startVoiceCall(friendUsername) {

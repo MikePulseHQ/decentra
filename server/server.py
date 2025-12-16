@@ -11,6 +11,7 @@ from datetime import datetime
 import bcrypt
 import secrets
 import string
+import random
 from aiohttp import web
 import os
 
@@ -79,7 +80,6 @@ def get_next_dm_id():
 
 def get_next_call_id():
     """Get next voice call ID."""
-    import random
     return f"call_{random.randint(100000, 999999)}"
 
 
@@ -637,7 +637,8 @@ async def handler(websocket):
                         # Direct voice call with a friend
                         friend_username = data.get('username', '').strip()
                         
-                        if friend_username in users and friend_username in users[username]['friends']:
+                        # Verify mutual friendship
+                        if friend_username in users and friend_username in users[username]['friends'] and username in users[friend_username]['friends']:
                             # Notify the friend about incoming call
                             await send_to_user(friend_username, json.dumps({
                                 'type': 'incoming_voice_call',
