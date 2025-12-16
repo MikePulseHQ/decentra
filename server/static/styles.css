@@ -586,3 +586,89 @@ body {
         max-width: 85%;
     }
 }
+
+/* Voice chat styles */
+.voice-controls {
+    padding: 15px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-top: 2px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.voice-status {
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.voice-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.voice-channel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.voice-count {
+    background: #667eea;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.voice-call-btn {
+    margin-left: auto;
+    padding: 4px 8px;
+    font-size: 14px;
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #218838;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Incoming call modal styling */
+#incoming-call-modal .modal-content {
+    text-align: center;
+}
+
+#incoming-call-modal h3 {
+    margin-bottom: 15px;
+    color: #333;
+}
+
+#incoming-call-modal p {
+    font-size: 18px;
+    color: #666;
+    margin-bottom: 20px;
+}
+
+.button-group {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+}

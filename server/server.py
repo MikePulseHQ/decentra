@@ -25,10 +25,14 @@ users = {}
 # Store active invite codes: {code: creator_username}
 invite_codes = {}
 
-# Store servers: {server_id: {name, owner, members: set(), channels: {channel_id: {name, messages: []}}}}
+# Store servers: {server_id: {name, owner, members: set(), channels: {channel_id: {name, type: 'text'|'voice', messages: [], voice_members: set()}}}}
 servers = {}
 # Store direct messages: {dm_id: {participants: set(), messages: []}}
 direct_messages = {}
+# Store voice calls: {call_id: {participants: set(), type: 'direct'|'channel', server_id: str, channel_id: str}}
+voice_calls = {}
+# Store voice state: {username: {in_voice: bool, channel_id: str, server_id: str, muted: bool}}
+voice_states = {}
 
 # Helper counters for IDs
 server_counter = 0
@@ -71,6 +75,12 @@ def get_next_dm_id():
     global dm_counter
     dm_counter += 1
     return f"dm_{dm_counter}"
+
+
+def get_next_call_id():
+    """Get next voice call ID."""
+    import random
+    return f"call_{random.randint(100000, 999999)}"
 
 
 def get_or_create_dm(user1, user2):
@@ -239,7 +249,7 @@ async def handler(websocket):
                     'name': server_data['name'],
                     'owner': server_data['owner'],
                     'channels': [
-                        {'id': ch_id, 'name': ch_data['name']}
+                        {'id': ch_id, 'name': ch_data['name'], 'type': ch_data.get('type', 'text')}
                         for ch_id, ch_data in server_data['channels'].items()
                     ]
                 })
@@ -351,7 +361,9 @@ async def handler(websocket):
                                 'channels': {
                                     channel_id: {
                                         'name': 'general',
-                                        'messages': []
+                                        'type': 'text',
+                                        'messages': [],
+                                        'voice_members': set()
                                     }
                                 }
                             }
@@ -362,7 +374,7 @@ async def handler(websocket):
                                     'id': server_id,
                                     'name': server_name,
                                     'owner': username,
-                                    'channels': [{'id': channel_id, 'name': 'general'}]
+                                    'channels': [{'id': channel_id, 'name': 'general', 'type': 'text'}]
                                 }
                             }))
                             print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} created server: {server_name}")
@@ -379,7 +391,7 @@ async def handler(websocket):
                                     'name': servers[server_id]['name'],
                                     'owner': servers[server_id]['owner'],
                                     'channels': [
-                                        {'id': ch_id, 'name': ch_data['name']}
+                                        {'id': ch_id, 'name': ch_data['name'], 'type': ch_data.get('type', 'text')}
                                         for ch_id, ch_data in servers[server_id]['channels'].items()
                                     ]
                                 }
@@ -493,6 +505,163 @@ async def handler(websocket):
                             'message': f'Invite code generated: {invite_code}'
                         }))
                         print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} generated invite code: {invite_code}")
+                    
+                    # Voice chat handlers
+                    elif data.get('type') == 'create_voice_channel':
+                        server_id = data.get('server_id', '')
+                        channel_name = data.get('name', '').strip()
+                        
+                        if server_id in servers and channel_name:
+                            if username == servers[server_id]['owner']:
+                                channel_id = get_next_channel_id()
+                                servers[server_id]['channels'][channel_id] = {
+                                    'name': channel_name,
+                                    'type': 'voice',
+                                    'messages': [],
+                                    'voice_members': set()
+                                }
+                                
+                                # Notify all server members
+                                channel_info = json.dumps({
+                                    'type': 'voice_channel_created',
+                                    'server_id': server_id,
+                                    'channel': {'id': channel_id, 'name': channel_name, 'type': 'voice'}
+                                })
+                                await broadcast_to_server(server_id, channel_info)
+                                print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} created voice channel: {channel_name}")
+                    
+                    elif data.get('type') == 'join_voice_channel':
+                        server_id = data.get('server_id', '')
+                        channel_id = data.get('channel_id', '')
+                        
+                        if server_id in servers and channel_id in servers[server_id]['channels']:
+                            if username in servers[server_id]['members']:
+                                # Add to voice channel
+                                servers[server_id]['channels'][channel_id]['voice_members'].add(username)
+                                voice_states[username] = {
+                                    'in_voice': True,
+                                    'channel_id': channel_id,
+                                    'server_id': server_id,
+                                    'muted': False
+                                }
+                                
+                                # Get current voice members
+                                voice_members = list(servers[server_id]['channels'][channel_id]['voice_members'])
+                                
+                                # Notify all server members about voice state change
+                                await broadcast_to_server(server_id, json.dumps({
+                                    'type': 'voice_state_update',
+                                    'server_id': server_id,
+                                    'channel_id': channel_id,
+                                    'username': username,
+                                    'state': 'joined',
+                                    'voice_members': voice_members
+                                }))
+                                print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} joined voice channel {channel_id}")
+                    
+                    elif data.get('type') == 'leave_voice_channel':
+                        if username in voice_states:
+                            state = voice_states[username]
+                            server_id = state.get('server_id')
+                            channel_id = state.get('channel_id')
+                            
+                            if server_id and channel_id:
+                                if server_id in servers and channel_id in servers[server_id]['channels']:
+                                    servers[server_id]['channels'][channel_id]['voice_members'].discard(username)
+                                    voice_members = list(servers[server_id]['channels'][channel_id]['voice_members'])
+                                    
+                                    # Notify all server members
+                                    await broadcast_to_server(server_id, json.dumps({
+                                        'type': 'voice_state_update',
+                                        'server_id': server_id,
+                                        'channel_id': channel_id,
+                                        'username': username,
+                                        'state': 'left',
+                                        'voice_members': voice_members
+                                    }))
+                            
+                            del voice_states[username]
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} left voice channel")
+                    
+                    elif data.get('type') == 'voice_mute':
+                        muted = data.get('muted', False)
+                        if username in voice_states:
+                            voice_states[username]['muted'] = muted
+                            state = voice_states[username]
+                            
+                            # Notify others in the same voice channel
+                            if state.get('server_id') and state.get('channel_id'):
+                                await broadcast_to_server(state['server_id'], json.dumps({
+                                    'type': 'voice_mute_update',
+                                    'username': username,
+                                    'muted': muted
+                                }))
+                    
+                    # WebRTC signaling
+                    elif data.get('type') == 'webrtc_offer':
+                        target_user = data.get('target')
+                        offer = data.get('offer')
+                        context = data.get('context', {})
+                        
+                        if target_user:
+                            await send_to_user(target_user, json.dumps({
+                                'type': 'webrtc_offer',
+                                'from': username,
+                                'offer': offer,
+                                'context': context
+                            }))
+                    
+                    elif data.get('type') == 'webrtc_answer':
+                        target_user = data.get('target')
+                        answer = data.get('answer')
+                        
+                        if target_user:
+                            await send_to_user(target_user, json.dumps({
+                                'type': 'webrtc_answer',
+                                'from': username,
+                                'answer': answer
+                            }))
+                    
+                    elif data.get('type') == 'webrtc_ice_candidate':
+                        target_user = data.get('target')
+                        candidate = data.get('candidate')
+                        
+                        if target_user:
+                            await send_to_user(target_user, json.dumps({
+                                'type': 'webrtc_ice_candidate',
+                                'from': username,
+                                'candidate': candidate
+                            }))
+                    
+                    elif data.get('type') == 'start_voice_call':
+                        # Direct voice call with a friend
+                        friend_username = data.get('username', '').strip()
+                        
+                        if friend_username in users and friend_username in users[username]['friends']:
+                            # Notify the friend about incoming call
+                            await send_to_user(friend_username, json.dumps({
+                                'type': 'incoming_voice_call',
+                                'from': username
+                            }))
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} calling {friend_username}")
+                    
+                    elif data.get('type') == 'accept_voice_call':
+                        caller_username = data.get('from', '').strip()
+                        
+                        if caller_username in users:
+                            await send_to_user(caller_username, json.dumps({
+                                'type': 'voice_call_accepted',
+                                'from': username
+                            }))
+                    
+                    elif data.get('type') == 'reject_voice_call':
+                        caller_username = data.get('from', '').strip()
+                        
+                        if caller_username in users:
+                            await send_to_user(caller_username, json.dumps({
+                                'type': 'voice_call_rejected',
+                                'from': username
+                            }))
                         
                 except json.JSONDecodeError:
                     print("Invalid JSON received")
@@ -512,6 +681,29 @@ async def handler(websocket):
             del clients[websocket]
         
         if username and authenticated:
+            # Clean up voice state
+            if username in voice_states:
+                state = voice_states[username]
+                server_id = state.get('server_id')
+                channel_id = state.get('channel_id')
+                
+                if server_id and channel_id:
+                    if server_id in servers and channel_id in servers[server_id]['channels']:
+                        servers[server_id]['channels'][channel_id]['voice_members'].discard(username)
+                        voice_members = list(servers[server_id]['channels'][channel_id]['voice_members'])
+                        
+                        # Notify all server members
+                        await broadcast_to_server(server_id, json.dumps({
+                            'type': 'voice_state_update',
+                            'server_id': server_id,
+                            'channel_id': channel_id,
+                            'username': username,
+                            'state': 'left',
+                            'voice_members': voice_members
+                        }))
+                
+                del voice_states[username]
+            
             # Notify others about user leaving
             leave_message = json.dumps({
                 'type': 'system',

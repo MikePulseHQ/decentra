@@ -19,12 +19,14 @@
     const wsUrl = `${protocol}//${window.location.host}/ws`;
     let ws = null;
     let authenticated = false;
+    let voiceChat = null; // VoiceChat instance
     
     // Current context
     let currentContext = null; // {type: 'server'|'dm'|'global', id: server_id/channel_id or dm_id}
     let servers = [];
     let dms = [];
     let friends = [];
+    let voiceMembers = {}; // Track voice members by channel: {server_id/channel_id: [usernames]}
     
     // DOM elements
     const messagesContainer = document.getElementById('messages');
@@ -46,6 +48,7 @@
     const userMenuBtn = document.getElementById('user-menu-btn');
     const userMenu = document.getElementById('user-menu');
     const menuCreateServerBtn = document.getElementById('menu-create-server-btn');
+    const menuCreateVoiceChannelBtn = document.getElementById('menu-create-voice-channel-btn');
     const menuInviteBtn = document.getElementById('menu-invite-btn');
     const menuLogoutBtn = document.getElementById('menu-logout-btn');
     const menuFriendsBtn = document.getElementById('menu-friends-btn');
@@ -61,10 +64,27 @@
     const serverNameInput = document.getElementById('server-name-input');
     const cancelServerBtn = document.getElementById('cancel-server-btn');
     
+    const createVoiceChannelModal = document.getElementById('create-voice-channel-modal');
+    const createVoiceChannelForm = document.getElementById('create-voice-channel-form');
+    const voiceChannelNameInput = document.getElementById('voice-channel-name-input');
+    const cancelVoiceChannelBtn = document.getElementById('cancel-voice-channel-btn');
+    
     const searchUsersModal = document.getElementById('search-users-modal');
     const searchUsersInput = document.getElementById('search-users-input');
     const searchResults = document.getElementById('search-results');
     const closeSearchModalBtn = document.getElementById('close-search-modal');
+    
+    // Voice elements
+    const voiceControls = document.getElementById('voice-controls');
+    const voiceStatusText = document.getElementById('voice-status-text');
+    const muteBtn = document.getElementById('mute-btn');
+    const leaveVoiceBtn = document.getElementById('leave-voice-btn');
+    const incomingCallModal = document.getElementById('incoming-call-modal');
+    const callerNameDisplay = document.getElementById('caller-name');
+    const acceptCallBtn = document.getElementById('accept-call-btn');
+    const rejectCallBtn = document.getElementById('reject-call-btn');
+    let incomingCallFrom = null;
+    let currentlySelectedServer = null;
     
     // Connect to WebSocket
     function connect() {
@@ -118,6 +138,8 @@
                 sessionStorage.removeItem('password');
                 sessionStorage.removeItem('authMode');
                 sessionStorage.removeItem('inviteCode');
+                // Initialize voice chat
+                voiceChat = new VoiceChat(ws, username);
                 break;
                 
             case 'auth_error':
@@ -210,6 +232,64 @@
             case 'invite_code':
                 showInviteModal(data.code);
                 break;
+                
+            // Voice chat messages
+            case 'voice_channel_created':
+                const server = servers.find(s => s.id === data.server_id);
+                if (server) {
+                    server.channels.push(data.channel);
+                    if (currentContext && currentContext.type === 'server' && currentContext.serverId === data.server_id) {
+                        updateChannelsForServer(data.server_id);
+                    }
+                }
+                break;
+                
+            case 'voice_state_update':
+                if (voiceChat) {
+                    voiceChat.handleVoiceStateUpdate(data);
+                }
+                // Update voice members display
+                const channelKey = `${data.server_id}/${data.channel_id}`;
+                voiceMembers[channelKey] = data.voice_members || [];
+                updateChannelsForServer(data.server_id);
+                break;
+                
+            case 'incoming_voice_call':
+                handleIncomingCall(data.from);
+                break;
+                
+            case 'voice_call_accepted':
+                if (voiceChat && voiceChat.directCallPeer === data.from) {
+                    // Start WebRTC connection
+                    voiceChat.createPeerConnection(data.from, true);
+                }
+                break;
+                
+            case 'voice_call_rejected':
+                if (voiceChat) {
+                    voiceChat.endDirectCall();
+                    hideVoiceControls();
+                    alert(`${data.from} rejected your call`);
+                }
+                break;
+                
+            case 'webrtc_offer':
+                if (voiceChat) {
+                    voiceChat.handleOffer(data.from, data.offer, data.context);
+                }
+                break;
+                
+            case 'webrtc_answer':
+                if (voiceChat) {
+                    voiceChat.handleAnswer(data.from, data.answer);
+                }
+                break;
+                
+            case 'webrtc_ice_candidate':
+                if (voiceChat) {
+                    voiceChat.handleIceCandidate(data.from, data.candidate);
+                }
+                break;
         }
     }
     
@@ -244,7 +324,21 @@
         dms.forEach(dm => {
             const dmItem = document.createElement('div');
             dmItem.className = 'dm-item';
-            dmItem.textContent = dm.username;
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = dm.username;
+            
+            const callBtn = document.createElement('button');
+            callBtn.className = 'btn btn-small btn-icon voice-call-btn';
+            callBtn.textContent = '📞';
+            callBtn.title = 'Voice Call';
+            callBtn.onclick = (e) => {
+                e.stopPropagation();
+                startVoiceCall(dm.username);
+            };
+            
+            dmItem.appendChild(nameSpan);
+            dmItem.appendChild(callBtn);
             dmItem.onclick = () => selectDM(dm.id);
             dmsList.appendChild(dmItem);
         });
@@ -263,11 +357,18 @@
             const actionsDiv = document.createElement('div');
             actionsDiv.className = 'friend-actions';
             
+            const callBtn = document.createElement('button');
+            callBtn.className = 'btn btn-small btn-success btn-icon';
+            callBtn.textContent = '📞';
+            callBtn.title = 'Voice Call';
+            callBtn.onclick = () => startVoiceCall(friend);
+            
             const dmBtn = document.createElement('button');
             dmBtn.className = 'btn btn-small btn-primary btn-icon';
             dmBtn.textContent = 'DM';
             dmBtn.onclick = () => startDM(friend);
             
+            actionsDiv.appendChild(callBtn);
             actionsDiv.appendChild(dmBtn);
             friendItem.appendChild(nameSpan);
             friendItem.appendChild(actionsDiv);
@@ -279,6 +380,8 @@
     function selectServer(serverId) {
         const server = servers.find(s => s.id === serverId);
         if (!server) return;
+        
+        currentlySelectedServer = serverId;
         
         // Update UI
         document.querySelectorAll('.server-item').forEach(item => {
@@ -294,24 +397,53 @@
         friendsView.classList.add('hidden');
         
         serverNameDisplay.textContent = server.name;
+        updateChannelsForServer(serverId);
+        
+        // Auto-select first text channel
+        const firstTextChannel = server.channels.find(ch => ch.type === 'text');
+        if (firstTextChannel) {
+            selectChannel(serverId, firstTextChannel.id, firstTextChannel.name, firstTextChannel.type);
+        }
+    }
+    
+    // Update channels list for a server
+    function updateChannelsForServer(serverId) {
+        const server = servers.find(s => s.id === serverId);
+        if (!server) return;
+        
         channelsList.innerHTML = '';
         
         server.channels.forEach(channel => {
             const channelItem = document.createElement('div');
             channelItem.className = 'channel-item';
-            channelItem.textContent = '# ' + channel.name;
-            channelItem.onclick = () => selectChannel(serverId, channel.id, channel.name);
+            
+            if (channel.type === 'voice') {
+                channelItem.classList.add('voice-channel');
+                const channelKey = `${serverId}/${channel.id}`;
+                const members = voiceMembers[channelKey] || [];
+                const memberCount = members.length;
+                
+                channelItem.innerHTML = `
+                    <span>🔊 ${escapeHtml(channel.name)}</span>
+                    ${memberCount > 0 ? `<span class="voice-count">${memberCount}</span>` : ''}
+                `;
+                channelItem.onclick = () => joinVoiceChannel(serverId, channel.id, channel.name);
+            } else {
+                channelItem.textContent = '# ' + channel.name;
+                channelItem.onclick = () => selectChannel(serverId, channel.id, channel.name, channel.type);
+            }
+            
             channelsList.appendChild(channelItem);
         });
-        
-        // Auto-select first channel
-        if (server.channels.length > 0) {
-            selectChannel(serverId, server.channels[0].id, server.channels[0].name);
-        }
     }
     
     // Select channel
-    function selectChannel(serverId, channelId, channelName) {
+    function selectChannel(serverId, channelId, channelName, channelType) {
+        if (channelType === 'voice') {
+            joinVoiceChannel(serverId, channelId, channelName);
+            return;
+        }
+        
         currentContext = { type: 'server', serverId, channelId };
         
         // Update UI
@@ -481,6 +613,46 @@
         serverNameInput.value = '';
     });
     
+    // Create voice channel (from menu)
+    menuCreateVoiceChannelBtn.addEventListener('click', () => {
+        userMenu.classList.add('hidden');
+        
+        if (!currentlySelectedServer) {
+            alert('Please select a server first');
+            return;
+        }
+        
+        const server = servers.find(s => s.id === currentlySelectedServer);
+        if (!server || server.owner !== username) {
+            alert('Only server owners can create voice channels');
+            return;
+        }
+        
+        createVoiceChannelModal.classList.remove('hidden');
+        voiceChannelNameInput.focus();
+    });
+    
+    createVoiceChannelForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const channelName = voiceChannelNameInput.value.trim();
+        if (!channelName || !currentlySelectedServer) return;
+        
+        ws.send(JSON.stringify({
+            type: 'create_voice_channel',
+            server_id: currentlySelectedServer,
+            name: channelName
+        }));
+        
+        createVoiceChannelModal.classList.add('hidden');
+        voiceChannelNameInput.value = '';
+    });
+    
+    cancelVoiceChannelBtn.addEventListener('click', () => {
+        createVoiceChannelModal.classList.add('hidden');
+        voiceChannelNameInput.value = '';
+    });
+    
     // Friends view (from menu)
     menuFriendsBtn.addEventListener('click', () => {
         userMenu.classList.add('hidden');
@@ -611,16 +783,115 @@
         }
     });
     
+    createVoiceChannelModal.addEventListener('click', (e) => {
+        if (e.target === createVoiceChannelModal) {
+            createVoiceChannelModal.classList.add('hidden');
+            voiceChannelNameInput.value = '';
+        }
+    });
+    
     // Logout (from menu)
     menuLogoutBtn.addEventListener('click', logout);
     
     function logout() {
+        // Clean up voice chat
+        if (voiceChat) {
+            voiceChat.leaveVoiceChannel();
+            voiceChat.endDirectCall();
+        }
+        
         sessionStorage.clear();
         if (ws) {
             ws.close();
         }
         window.location.href = '/static/index.html';
     }
+    
+    // Voice chat functions
+    function joinVoiceChannel(serverId, channelId, channelName) {
+        if (!voiceChat) return;
+        
+        voiceChat.joinVoiceChannel(serverId, channelId);
+        showVoiceControls(`Voice: ${channelName}`);
+        
+        // Update UI
+        chatTitle.textContent = `🔊 ${channelName}`;
+        messagesContainer.innerHTML = '<div class="welcome-message"><h2>Voice Channel</h2><p>You are now in the voice channel. Use the controls below to manage your audio.</p></div>';
+        messageInput.disabled = true;
+        submitBtn.disabled = true;
+    }
+    
+    function startVoiceCall(friendUsername) {
+        if (!voiceChat) return;
+        
+        voiceChat.startDirectCall(friendUsername);
+        showVoiceControls(`Calling ${friendUsername}...`);
+    }
+    
+    function handleIncomingCall(fromUsername) {
+        incomingCallFrom = fromUsername;
+        callerNameDisplay.textContent = `${fromUsername} is calling you...`;
+        incomingCallModal.classList.remove('hidden');
+    }
+    
+    function showVoiceControls(statusText) {
+        voiceStatusText.textContent = statusText;
+        voiceControls.classList.remove('hidden');
+    }
+    
+    function hideVoiceControls() {
+        voiceControls.classList.add('hidden');
+    }
+    
+    // Voice control event listeners
+    muteBtn.addEventListener('click', () => {
+        if (voiceChat) {
+            const muted = voiceChat.toggleMute();
+            muteBtn.textContent = muted ? '🔇' : '🎤';
+            muteBtn.title = muted ? 'Unmute' : 'Mute';
+        }
+    });
+    
+    leaveVoiceBtn.addEventListener('click', () => {
+        if (voiceChat) {
+            if (voiceChat.inDirectCall) {
+                voiceChat.endDirectCall();
+            } else {
+                voiceChat.leaveVoiceChannel();
+            }
+            hideVoiceControls();
+            muteBtn.textContent = '🎤';
+            muteBtn.title = 'Mute';
+        }
+    });
+    
+    acceptCallBtn.addEventListener('click', () => {
+        if (incomingCallFrom && voiceChat) {
+            voiceChat.acceptDirectCall(incomingCallFrom);
+            showVoiceControls(`In call with ${incomingCallFrom}`);
+            incomingCallModal.classList.add('hidden');
+            incomingCallFrom = null;
+        }
+    });
+    
+    rejectCallBtn.addEventListener('click', () => {
+        if (incomingCallFrom && voiceChat) {
+            voiceChat.rejectDirectCall(incomingCallFrom);
+            incomingCallModal.classList.add('hidden');
+            incomingCallFrom = null;
+        }
+    });
+    
+    // Close incoming call modal on outside click
+    incomingCallModal.addEventListener('click', (e) => {
+        if (e.target === incomingCallModal) {
+            if (incomingCallFrom && voiceChat) {
+                voiceChat.rejectDirectCall(incomingCallFrom);
+            }
+            incomingCallModal.classList.add('hidden');
+            incomingCallFrom = null;
+        }
+    });
     
     // Scroll to bottom of messages
     function scrollToBottom() {

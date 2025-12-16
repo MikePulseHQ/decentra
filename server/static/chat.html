@@ -38,6 +38,7 @@
                 <div id="user-menu" class="user-menu hidden">
                     <button id="menu-friends-btn" class="menu-item">Friends</button>
                     <button id="menu-create-server-btn" class="menu-item">Create Server</button>
+                    <button id="menu-create-voice-channel-btn" class="menu-item">Create Voice Channel</button>
                     <button id="menu-invite-btn" class="menu-item">Generate Invite</button>
                     <div class="menu-divider"></div>
                     <button id="menu-logout-btn" class="menu-item menu-item-danger">Logout</button>
@@ -91,10 +92,31 @@
                     <button type="submit" class="btn btn-primary" disabled>Send</button>
                 </form>
             </div>
+            
+            <!-- Voice controls panel -->
+            <div id="voice-controls" class="voice-controls hidden">
+                <div class="voice-status">
+                    <span id="voice-status-text">In Voice Channel</span>
+                </div>
+                <div class="voice-buttons">
+                    <button id="mute-btn" class="btn btn-secondary btn-icon" title="Mute/Unmute">🎤</button>
+                    <button id="leave-voice-btn" class="btn btn-danger">Leave Voice</button>
+                </div>
+            </div>
         </div>
     </div>
     
     <!-- Modals -->
+    <div id="incoming-call-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Incoming Voice Call</h3>
+            <p id="caller-name"></p>
+            <div class="button-group">
+                <button id="accept-call-btn" class="btn btn-success">Accept</button>
+                <button id="reject-call-btn" class="btn btn-danger">Reject</button>
+            </div>
+        </div>
+    </div>
     <div id="invite-modal" class="modal hidden">
         <div class="modal-content">
             <h3>Invite Code Generated</h3>
@@ -122,6 +144,22 @@
         </div>
     </div>
     
+    <div id="create-voice-channel-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Create Voice Channel</h3>
+            <form id="create-voice-channel-form">
+                <div class="form-group">
+                    <label for="voice-channel-name-input">Voice Channel Name</label>
+                    <input type="text" id="voice-channel-name-input" required>
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">Create</button>
+                    <button type="button" id="cancel-voice-channel-btn" class="btn btn-secondary">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
     <div id="search-users-modal" class="modal hidden">
         <div class="modal-content">
             <h3>Search Users</h3>
@@ -135,6 +173,7 @@
         </div>
     </div>
     
+    <script src="/static/voice.js"></script>
     <script src="/static/chat.js"></script>
 </body>
 </html>
