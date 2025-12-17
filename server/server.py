@@ -17,9 +17,10 @@ import os
 import base64
 import hashlib
 from database import Database
+from api import setup_api_routes
 
 # Initialize database
-db = Database(os.getenv('DB_PATH', '/data/decentra.db'))
+db = Database(os.getenv('DB_PATH', 'decentra.db'))
 
 # Store connected clients: {websocket: username}
 clients = {}
@@ -1358,6 +1359,9 @@ async def main():
     app.router.add_get('/static/{path:.*}', http_handler)
     app.router.add_get('/ws', websocket_handler)
     
+    # Setup REST API routes
+    setup_api_routes(app)
+    
     # Run the server
     runner = web.AppRunner(app)
     await runner.setup()
@@ -1367,6 +1371,7 @@ async def main():
     print("Server started successfully!")
     print("Access the web client at http://localhost:8765")
     print(f"Database: {db.db_path}")
+    print("REST API available at http://localhost:8765/api/*")
     
     # Keep running
     await asyncio.Future()
