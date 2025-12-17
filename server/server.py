@@ -1360,7 +1360,7 @@ async def main():
     app.router.add_get('/ws', websocket_handler)
     
     # Setup REST API routes
-    setup_api_routes(app)
+    setup_api_routes(app, db)
     
     # Run the server
     runner = web.AppRunner(app)
