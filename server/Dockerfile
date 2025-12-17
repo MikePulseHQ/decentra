@@ -8,6 +8,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy server code and static files
 COPY server.py .
+COPY database.py .
+COPY api.py .
 COPY static/ ./static/
 
 # Expose WebSocket port
