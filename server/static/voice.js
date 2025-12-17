@@ -19,6 +19,10 @@ class VoiceChat {
         this.selectedCameraId = null;
         this.setSinkIdWarningShown = false; // Track if setSinkId warning has been shown
         
+        // Video configuration constants
+        this.VIDEO_WIDTH = 640;
+        this.VIDEO_HEIGHT = 480;
+        
         // ICE servers configuration (using public STUN servers)
         this.iceServers = {
             iceServers: [
@@ -212,8 +216,8 @@ class VoiceChat {
             // Get new stream
             const constraints = { 
                 video: deviceId ? 
-                    { deviceId: { exact: deviceId }, width: 640, height: 480 } : 
-                    { width: 640, height: 480 }, 
+                    { deviceId: { exact: deviceId }, width: this.VIDEO_WIDTH, height: this.VIDEO_HEIGHT } : 
+                    { width: this.VIDEO_WIDTH, height: this.VIDEO_HEIGHT }, 
                 audio: false 
             };
             
@@ -230,15 +234,17 @@ class VoiceChat {
                     }
                 });
                 
-                // Stop old stream
-                oldStream.getTracks().forEach(track => track.stop());
-                
                 // Update local video display if it exists
                 if (window.onLocalVideoTrack) {
                     window.onLocalVideoTrack(this.localVideoStream);
                 }
+                
+                // Only stop old stream after successfully creating and applying new stream
+                oldStream.getTracks().forEach(track => track.stop());
             } catch (error) {
                 console.error('Error switching camera:', error);
+                // Restore old stream on error
+                this.localVideoStream = oldStream;
                 alert('Failed to switch camera. Please try again.');
             }
         }
@@ -250,8 +256,8 @@ class VoiceChat {
             try {
                 const constraints = {
                     video: this.selectedCameraId ? 
-                        { deviceId: { exact: this.selectedCameraId }, width: 640, height: 480 } : 
-                        { width: 640, height: 480 },
+                        { deviceId: { exact: this.selectedCameraId }, width: this.VIDEO_WIDTH, height: this.VIDEO_HEIGHT } : 
+                        { width: this.VIDEO_WIDTH, height: this.VIDEO_HEIGHT },
                     audio: false
                 };
                 this.localVideoStream = await navigator.mediaDevices.getUserMedia(constraints);
