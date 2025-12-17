@@ -20,7 +20,7 @@ from database import Database
 from api import setup_api_routes
 
 # Initialize database
-db = Database(os.getenv('DB_PATH', 'decentra.db'))
+db = Database()
 
 # Store connected clients: {websocket: username}
 clients = {}
@@ -158,7 +158,7 @@ def has_permission(server_id, username, permission):
     members = db.get_server_members(server_id)
     for member in members:
         if member['username'] == username:
-            return member.get(permission, 0) == 1
+            return member.get(permission, False)
     
     # Default: no permission
     return False
@@ -354,9 +354,9 @@ async def handler(websocket):
                     for member in members:
                         if member['username'] == username:
                             server_info['permissions'] = {
-                                'can_create_channel': member.get('can_create_channel', 0) == 1,
-                                'can_edit_channel': member.get('can_edit_channel', 0) == 1,
-                                'can_delete_channel': member.get('can_delete_channel', 0) == 1
+                                'can_create_channel': member.get('can_create_channel', False),
+                                'can_edit_channel': member.get('can_edit_channel', False),
+                                'can_delete_channel': member.get('can_delete_channel', False)
                             }
                             break
                 user_servers.append(server_info)
@@ -922,9 +922,9 @@ async def handler(websocket):
                                     }
                                     if member['username'] != server['owner']:
                                         member_data['permissions'] = {
-                                            'can_create_channel': member.get('can_create_channel', 0) == 1,
-                                            'can_edit_channel': member.get('can_edit_channel', 0) == 1,
-                                            'can_delete_channel': member.get('can_delete_channel', 0) == 1
+                                            'can_create_channel': member.get('can_create_channel', False),
+                                            'can_edit_channel': member.get('can_edit_channel', False),
+                                            'can_delete_channel': member.get('can_delete_channel', False)
                                         }
                                     members_list.append(member_data)
                                 
@@ -1370,7 +1370,7 @@ async def main():
     
     print("Server started successfully!")
     print("Access the web client at http://localhost:8765")
-    print(f"Database: {db.db_path}")
+    print(f"Database: PostgreSQL at {db.db_url}")
     print("REST API available at http://localhost:8765/api/*")
     
     # Keep running

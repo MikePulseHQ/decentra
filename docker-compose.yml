@@ -1,6 +1,24 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: decentra-postgres
+    environment:
+      - POSTGRES_DB=decentra
+      - POSTGRES_USER=decentra
+      - POSTGRES_PASSWORD=decentra
+    volumes:
+      - decentra-data:/var/lib/postgresql/data
+    networks:
+      - decentra-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U decentra"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   server:
     build:
       context: ./server
@@ -8,13 +26,14 @@ services:
     container_name: decentra-server
     ports:
       - "8765:8765"
-    volumes:
-      - decentra-data:/data
     environment:
-      - DB_PATH=/data/decentra.db
+      - DATABASE_URL=postgresql://decentra:decentra@postgres:5432/decentra
     networks:
       - decentra-network
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   decentra-data:
