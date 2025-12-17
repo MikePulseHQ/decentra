@@ -2,17 +2,17 @@
 
 ## Overview
 
-This PR successfully implements persistent data storage using SQLite and adds REST API endpoints to support future desktop application development for the Decentra chat application.
+This PR successfully implements persistent data storage using PostgreSQL and adds REST API endpoints to support future desktop application development for the Decentra chat application.
 
 ## What Was Changed
 
 ### 1. Database Persistence Layer
 
 **New File: `server/database.py`**
-- Comprehensive SQLite database implementation
+- Comprehensive PostgreSQL database implementation using psycopg2
 - Context manager for safe connection handling
 - Full CRUD operations for all data models
-- Automatic schema initialization on startup
+- Automatic schema initialization on startup with retry logic
 
 **Database Schema:**
 - `users` - User accounts with authentication and avatars
@@ -89,12 +89,12 @@ WebSocket → Python Dict → Lost on Restart
 
 **After (Persistent):**
 ```
-WebSocket → Database Layer → SQLite File → Persists Forever
+WebSocket → Database Layer → PostgreSQL → Persists Forever
 ```
 
 ### Database Design Decisions
 
-1. **SQLite Choice**: Lightweight, file-based, no separate server needed, perfect for self-hosted applications
+1. **PostgreSQL Choice**: Production-ready, scalable, ACID-compliant relational database with excellent support for concurrent connections
 
 2. **Indexed Messages**: Added index on `(context_type, context_id, timestamp)` for fast message retrieval
 
@@ -189,11 +189,11 @@ docker-compose up -d
 cd server
 pip install -r requirements.txt
 python server.py
-# Database created as: decentra.db
+# Database: PostgreSQL (requires running PostgreSQL instance)
 ```
 
 ### Environment Variables
-- `DB_PATH`: Override database file location (default: `decentra.db` or `/data/decentra.db` in Docker)
+- `DATABASE_URL`: PostgreSQL connection string (default: `postgresql://decentra:decentra@localhost:5432/decentra`)
 
 ## Known Limitations
 
@@ -204,8 +204,8 @@ python server.py
 
 ## Recommendations
 
-1. **Backup**: Regularly backup the database file or Docker volume
-2. **Monitoring**: Monitor database file size growth
+1. **Backup**: Regularly backup the PostgreSQL database or Docker volume
+2. **Monitoring**: Monitor database size and performance
 3. **Future**: Consider adding authentication tokens for REST API
 4. **Future**: Add database migration tools
 5. **Future**: Implement message pruning for old messages
