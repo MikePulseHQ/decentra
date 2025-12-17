@@ -388,17 +388,6 @@
                 }
                 break;
                 
-            // Voice chat messages
-            case 'voice_channel_created':
-                const server = servers.find(s => s.id === data.server_id);
-                if (server) {
-                    server.channels.push(data.channel);
-                    if (currentContext && currentContext.type === 'server' && currentContext.serverId === data.server_id) {
-                        updateChannelsForServer(data.server_id);
-                    }
-                }
-                break;
-                
             case 'voice_state_update':
                 if (voiceChat) {
                     voiceChat.handleVoiceStateUpdate(data);
