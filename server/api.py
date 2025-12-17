@@ -7,11 +7,9 @@ Provides HTTP REST API for future desktop application integration
 import json
 from aiohttp import web
 import bcrypt
-from database import Database
-import os
 
-# Use the same database instance
-db = Database(os.getenv('DB_PATH', 'decentra.db'))
+# Database instance will be set by setup_api_routes
+db = None
 
 
 def verify_password(password, password_hash):
@@ -267,8 +265,10 @@ async def api_dms(request):
         }, status=500)
 
 
-def setup_api_routes(app):
+def setup_api_routes(app, database):
     """Setup REST API routes on the aiohttp application."""
+    global db
+    db = database
     app.router.add_post('/api/auth', api_auth)
     app.router.add_get('/api/servers', api_servers)
     app.router.add_get('/api/messages', api_messages)
