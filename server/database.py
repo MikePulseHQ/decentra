@@ -319,28 +319,23 @@ class Database:
                 RETURNING id
             ''', (username, content, datetime.now(), context_type, context_id))
             result = cursor.fetchone()
-            return result['id'] if result else 0
+            return result['id']
     
     def get_messages(self, context_type: str, context_id: Optional[str] = None, limit: int = 100) -> List[Dict]:
         """Get messages for a context."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT * FROM messages 
+                SELECT id, username, content, 
+                       timestamp::text as timestamp,
+                       context_type, context_id
+                FROM messages 
                 WHERE context_type = %s AND context_id = %s
                 ORDER BY timestamp DESC
                 LIMIT %s
             ''', (context_type, context_id, limit))
-            # Reverse to get chronological order
-            messages = cursor.fetchall()
-            # Convert timestamp to ISO format string for compatibility
-            result = []
-            for msg in reversed(messages):
-                msg_dict = dict(msg)
-                if isinstance(msg_dict.get('timestamp'), datetime):
-                    msg_dict['timestamp'] = msg_dict['timestamp'].isoformat()
-                result.append(msg_dict)
-            return result
+            # Reverse to get chronological order and return as list of dicts
+            return [dict(row) for row in reversed(cursor.fetchall())]
     
     # Friendship operations
     def add_friend_request(self, requester: str, target: str) -> bool:
