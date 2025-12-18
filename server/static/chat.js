@@ -219,8 +219,12 @@
             case 'auth_success':
                 authenticated = true;
                 console.log('Authentication successful');
-                sessionStorage.removeItem('password');
-                sessionStorage.removeItem('authMode');
+                // Keep credentials in sessionStorage to allow reconnection after container restarts
+                // NOTE: Password is stored in sessionStorage (set by auth.js during login).
+                // While not ideal for security, it's necessary for WebSocket reconnection.
+                // TODO: Consider implementing token-based authentication for better security.
+                // sessionStorage.removeItem('password');
+                // sessionStorage.removeItem('authMode');
                 sessionStorage.removeItem('inviteCode');
                 // Initialize voice chat
                 voiceChat = new VoiceChat(ws, username);
