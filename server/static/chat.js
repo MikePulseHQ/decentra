@@ -221,7 +221,7 @@
                 console.log('Authentication successful');
                 // Keep credentials in sessionStorage to allow reconnection after container restarts
                 // sessionStorage.removeItem('password');
-                sessionStorage.removeItem('authMode');
+                // sessionStorage.removeItem('authMode');
                 sessionStorage.removeItem('inviteCode');
                 // Initialize voice chat
                 voiceChat = new VoiceChat(ws, username);
