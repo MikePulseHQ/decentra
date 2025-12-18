@@ -220,6 +220,9 @@
                 authenticated = true;
                 console.log('Authentication successful');
                 // Keep credentials in sessionStorage to allow reconnection after container restarts
+                // NOTE: Password is stored in sessionStorage (set by auth.js during login).
+                // While not ideal for security, it's necessary for WebSocket reconnection.
+                // TODO: Consider implementing token-based authentication for better security.
                 // sessionStorage.removeItem('password');
                 // sessionStorage.removeItem('authMode');
                 sessionStorage.removeItem('inviteCode');
