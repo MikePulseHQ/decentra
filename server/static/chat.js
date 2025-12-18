@@ -219,7 +219,8 @@
             case 'auth_success':
                 authenticated = true;
                 console.log('Authentication successful');
-                sessionStorage.removeItem('password');
+                // Keep credentials in sessionStorage to allow reconnection after container restarts
+                // sessionStorage.removeItem('password');
                 sessionStorage.removeItem('authMode');
                 sessionStorage.removeItem('inviteCode');
                 // Initialize voice chat
