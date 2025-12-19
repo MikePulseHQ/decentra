@@ -50,6 +50,7 @@
     const userMenuBtn = document.getElementById('user-menu-btn');
     const userMenu = document.getElementById('user-menu');
     const menuCreateServerBtn = document.getElementById('menu-create-server-btn');
+    const menuJoinServerBtn = document.getElementById('menu-join-server-btn');
     const menuInviteBtn = document.getElementById('menu-invite-btn');
     const menuLogoutBtn = document.getElementById('menu-logout-btn');
     const menuFriendsBtn = document.getElementById('menu-friends-btn');
@@ -64,6 +65,12 @@
     const createServerForm = document.getElementById('create-server-form');
     const serverNameInput = document.getElementById('server-name-input');
     const cancelServerBtn = document.getElementById('cancel-server-btn');
+    
+    const joinServerModal = document.getElementById('join-server-modal');
+    const joinServerForm = document.getElementById('join-server-form');
+    const serverInviteInput = document.getElementById('server-invite-input');
+    const cancelJoinServerBtn = document.getElementById('cancel-join-server-btn');
+    const joinServerError = document.getElementById('join-server-error');
     
     const createVoiceChannelModal = document.getElementById('create-voice-channel-modal');
     const createVoiceChannelForm = document.getElementById('create-voice-channel-form');
@@ -296,6 +303,10 @@
             case 'server_joined':
                 servers.push(data.server);
                 updateServersList();
+                joinServerModal.classList.add('hidden');
+                serverInviteInput.value = '';
+                joinServerError.classList.add('hidden');
+                selectServer(data.server.id);
                 break;
                 
             case 'friend_added':
@@ -457,7 +468,13 @@
                 break;
                 
             case 'error':
-                alert(data.message);
+                // Show error in join server modal if it's open
+                if (!joinServerModal.classList.contains('hidden')) {
+                    joinServerError.textContent = data.message;
+                    joinServerError.classList.remove('hidden');
+                } else {
+                    alert(data.message);
+                }
                 break;
                 
             // Channel creation messages
@@ -1037,6 +1054,14 @@
         serverNameInput.focus();
     });
     
+    menuJoinServerBtn.addEventListener('click', () => {
+        userMenu.classList.add('hidden');
+        joinServerModal.classList.remove('hidden');
+        joinServerError.classList.add('hidden');
+        serverInviteInput.value = '';
+        serverInviteInput.focus();
+    });
+    
     createServerForm.addEventListener('submit', (e) => {
         e.preventDefault();
         
@@ -1049,9 +1074,27 @@
         }));
     });
     
+    joinServerForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        const inviteCode = serverInviteInput.value.trim();
+        if (!inviteCode) return;
+        
+        ws.send(JSON.stringify({
+            type: 'join_server_with_invite',
+            invite_code: inviteCode
+        }));
+    });
+    
     cancelServerBtn.addEventListener('click', () => {
         createServerModal.classList.add('hidden');
         serverNameInput.value = '';
+    });
+    
+    cancelJoinServerBtn.addEventListener('click', () => {
+        joinServerModal.classList.add('hidden');
+        serverInviteInput.value = '';
+        joinServerError.classList.add('hidden');
     });
     
     // Create text channel (from server settings)

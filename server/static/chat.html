@@ -40,6 +40,7 @@
                     <button id="menu-avatar-btn" class="menu-item">Set Avatar</button>
                     <button id="menu-friends-btn" class="menu-item">Friends</button>
                     <button id="menu-create-server-btn" class="menu-item">Create Server</button>
+                    <button id="menu-join-server-btn" class="menu-item">Join Server</button>
                     <button id="menu-invite-btn" class="menu-item">Generate Invite</button>
                     <div class="menu-divider"></div>
                     <button id="menu-logout-btn" class="menu-item menu-item-danger">Logout</button>
@@ -169,6 +170,23 @@
                 <div class="button-group">
                     <button type="submit" class="btn btn-primary">Create</button>
                     <button type="button" id="cancel-server-btn" class="btn btn-secondary">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="join-server-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Join Server</h3>
+            <form id="join-server-form">
+                <div class="form-group">
+                    <label for="server-invite-input">Invite Code</label>
+                    <input type="text" id="server-invite-input" placeholder="Enter server invite code" required>
+                </div>
+                <div id="join-server-error" class="error hidden"></div>
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">Join Server</button>
+                    <button type="button" id="cancel-join-server-btn" class="btn btn-secondary">Cancel</button>
                 </div>
             </form>
         </div>
