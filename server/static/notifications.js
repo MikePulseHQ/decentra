@@ -108,7 +108,7 @@ class NotificationManager {
         oscillator.frequency.exponentialRampToValueAtTime(600, startTime + 0.1);
 
         gainNode.gain.setValueAtTime(0.3, startTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3);
+        gainNode.gain.linearRampToValueAtTime(0, startTime + 0.3);
 
         oscillator.start(startTime);
         oscillator.stop(startTime + 0.3);
@@ -130,7 +130,7 @@ class NotificationManager {
             oscillator.frequency.setValueAtTime(freq, noteStart);
             
             gainNode.gain.setValueAtTime(0.25, noteStart);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, noteStart + noteDuration);
+            gainNode.gain.linearRampToValueAtTime(0, noteStart + noteDuration);
 
             oscillator.start(noteStart);
             oscillator.stop(noteStart + noteDuration);
@@ -148,7 +148,7 @@ class NotificationManager {
         oscillator.frequency.exponentialRampToValueAtTime(200, startTime + 0.05);
 
         gainNode.gain.setValueAtTime(0.4, startTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.05);
+        gainNode.gain.linearRampToValueAtTime(0, startTime + 0.05);
 
         oscillator.start(startTime);
         oscillator.stop(startTime + 0.05);
@@ -192,7 +192,7 @@ class NotificationManager {
                 
                 gainNode.gain.setValueAtTime(0.3, ringStart);
                 gainNode.gain.setValueAtTime(0.3, ringStart + 0.2);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, ringStart + 0.35);
+                gainNode.gain.linearRampToValueAtTime(0, ringStart + 0.35);
 
                 oscillator.start(ringStart);
                 oscillator.stop(ringStart + 0.35);
@@ -220,7 +220,7 @@ class NotificationManager {
                 oscillator.type = 'sine';
                 
                 gainNode.gain.setValueAtTime(0.25, noteStart);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, noteStart + 0.25);
+                gainNode.gain.linearRampToValueAtTime(0, noteStart + 0.25);
 
                 oscillator.start(noteStart);
                 oscillator.stop(noteStart + 0.25);
@@ -252,7 +252,7 @@ class NotificationManager {
                 oscillator.type = 'sine';
                 
                 gainNode.gain.setValueAtTime(0.25, noteStart);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, noteStart + note.duration);
+                gainNode.gain.linearRampToValueAtTime(0, noteStart + note.duration);
 
                 oscillator.start(noteStart);
                 oscillator.stop(noteStart + note.duration);
@@ -276,8 +276,7 @@ class NotificationManager {
         if ('Notification' in window && Notification.permission === 'granted') {
             const notification = new Notification(title, {
                 body: body,
-                icon: icon || '/static/login-background.png',
-                badge: '/static/login-background.png',
+                icon: icon || undefined, // Let browser use default icon
                 tag: 'decentra-notification',
                 requireInteraction: false
             });
@@ -294,15 +293,16 @@ class NotificationManager {
     }
 
     notifyNewMessage(sender, message) {
-        // Only show notification if window is not focused
-        if (!document.hasFocus()) {
+        // Only show notification if page is not visible
+        const isVisible = document.visibilityState === 'visible';
+        if (!isVisible) {
             this.showNotification(
                 `New message from ${sender}`,
                 message.length > 50 ? message.substring(0, 50) + '...' : message
             );
         }
         
-        // Always play sound regardless of focus
+        // Always play sound regardless of visibility
         this.playSound('message', this.messageSound);
     }
 

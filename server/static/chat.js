@@ -339,6 +339,7 @@
                 console.log('Received message:', data);
                 console.log('Current context:', currentContext);
                 console.log('Is for current context:', isMessageForCurrentContext(data));
+                
                 if (isMessageForCurrentContext(data)) {
                     console.log('Appending message to chat');
                     appendMessage(data);
@@ -346,7 +347,9 @@
                 } else {
                     console.log('Message not for current context, ignoring');
                 }
+                
                 // Trigger notification if message is from another user
+                // The notificationManager will handle visibility checks
                 if (data.username && data.username !== username && notificationManager) {
                     notificationManager.notifyNewMessage(data.username, data.content || '');
                 }
