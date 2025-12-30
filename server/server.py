@@ -94,7 +94,7 @@ def init_counters_from_db():
     with db.get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT channel_id FROM channels')
-        channel_ids = [row[0] for row in cursor.fetchall()]
+        channel_ids = [row['channel_id'] for row in cursor.fetchall()]
         if channel_ids:
             max_channel = max([int(c.split('_')[1]) for c in channel_ids] + [0])
             channel_counter = max_channel
@@ -104,7 +104,7 @@ def init_counters_from_db():
     with db.get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT dm_id FROM direct_messages')
-        dm_ids = [row[0] for row in cursor.fetchall()]
+        dm_ids = [row['dm_id'] for row in cursor.fetchall()]
         if dm_ids:
             max_dm = max([int(d.split('_')[1]) for d in dm_ids] + [0])
             dm_counter = max_dm
@@ -231,6 +231,19 @@ async def handler(websocket):
                 password = auth_data.get('password', '')
                 invite_code = auth_data.get('invite_code', '').strip()
                 
+                # Get admin settings
+                admin_settings = db.get_admin_settings()
+                allow_registration = admin_settings.get('allow_registration', True)
+                require_invite = admin_settings.get('require_invite', False)
+                
+                # Check if registration is disabled
+                if not allow_registration:
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'Registration is currently disabled'
+                    }))
+                    continue
+                
                 # Validation
                 if not username or not password:
                     await websocket.send_str(json.dumps({
@@ -246,10 +259,12 @@ async def handler(websocket):
                     }))
                     continue
                 
-                # Check invite code (required if users exist)
+                # Check invite code requirement
                 all_users = db.get_all_users()
                 invite_data = db.get_invite_code(invite_code) if invite_code else None
-                if all_users and not invite_data:
+                
+                # Require invite if admin setting is enabled OR if users already exist (legacy behavior)
+                if (require_invite or all_users) and not invite_data:
                     await websocket.send_str(json.dumps({
                         'type': 'auth_error',
                         'message': 'Valid invite code required'
@@ -439,6 +454,17 @@ async def handler(websocket):
                         context = data.get('context', 'global')  # 'global', 'server', or 'dm'
                         context_id = data.get('context_id', None)
                         
+                        # Get admin settings and enforce max message length
+                        admin_settings = db.get_admin_settings()
+                        max_length = admin_settings.get('max_message_length', 2000)
+                        
+                        if len(msg_content) > max_length:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': f'Message exceeds maximum length of {max_length} characters'
+                            }))
+                            continue
+                        
                         # Create message object
                         msg_obj = {
                             'type': 'message',
@@ -495,6 +521,20 @@ async def handler(websocket):
                     elif data.get('type') == 'create_server':
                         server_name = data.get('name', '').strip()
                         if server_name:
+                            # Get admin settings for server limits
+                            admin_settings = db.get_admin_settings()
+                            max_servers_per_user = admin_settings.get('max_servers_per_user', 100)
+                            
+                            # Check if user has reached server limit (0 = unlimited)
+                            if max_servers_per_user > 0:
+                                user_servers = db.get_user_servers(username)
+                                if len(user_servers) >= max_servers_per_user:
+                                    await websocket.send_str(json.dumps({
+                                        'type': 'error',
+                                        'message': f'Maximum servers per user ({max_servers_per_user}) reached'
+                                    }))
+                                    continue
+                            
                             server_id = get_next_server_id()
                             channel_id = get_next_channel_id()
                             
@@ -787,18 +827,8 @@ async def handler(websocket):
                                 'message': 'Access denied. Admin only.'
                             }))
                         else:
-                            # Load settings from file or database (for now, return defaults)
-                            settings = {
-                                'server_name': 'Decentra Chat',
-                                'max_message_length': 2000,
-                                'allow_registrations': True,
-                                'require_invite': True,
-                                'session_timeout': 0,
-                                'max_file_size': 10,
-                                'allow_embeds': True,
-                                'max_servers_per_user': 0,
-                                'max_channels_per_server': 0
-                            }
+                            # Load settings from database
+                            settings = db.get_admin_settings()
                             
                             await websocket.send_str(json.dumps({
                                 'type': 'admin_settings',
@@ -815,13 +845,20 @@ async def handler(websocket):
                             }))
                         else:
                             settings = data.get('settings', {})
-                            # For now, just acknowledge. In future, persist to database or config file
-                            print(f"[{datetime.now().strftime('%H:%M:%S')}] Admin {username} updated settings: {settings}")
+                            # Save settings to database
+                            success = db.update_admin_settings(settings)
                             
-                            await websocket.send_str(json.dumps({
-                                'type': 'settings_saved',
-                                'message': 'Settings saved successfully'
-                            }))
+                            if success:
+                                print(f"[{datetime.now().strftime('%H:%M:%S')}] Admin {username} updated settings: {settings}")
+                                await websocket.send_str(json.dumps({
+                                    'type': 'settings_saved',
+                                    'message': 'Settings saved successfully'
+                                }))
+                            else:
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': 'Failed to save settings'
+                                }))
                     
                     # Server settings handlers
                     elif data.get('type') == 'rename_server':
@@ -879,6 +916,18 @@ async def handler(websocket):
                             member_usernames = {m['username'] for m in members}
                             
                             if username not in member_usernames:
+                                # Get admin settings for member limits
+                                admin_settings = db.get_admin_settings()
+                                max_members = admin_settings.get('max_members_per_server', 1000)
+                                
+                                # Check if server has reached member limit (0 = unlimited)
+                                if max_members > 0 and len(members) >= max_members:
+                                    await websocket.send_str(json.dumps({
+                                        'type': 'error',
+                                        'message': f'Server has reached maximum members ({max_members})'
+                                    }))
+                                    continue
+                                
                                 # Add user to server
                                 db.add_server_member(server_id, username)
                                 
@@ -998,6 +1047,20 @@ async def handler(websocket):
                         
                         if db.get_server(server_id) and channel_name:
                             if has_permission(server_id, username, 'can_create_channel'):
+                                # Get admin settings for channel limits
+                                admin_settings = db.get_admin_settings()
+                                max_channels = admin_settings.get('max_channels_per_server', 50)
+                                
+                                # Check if server has reached channel limit (0 = unlimited)
+                                if max_channels > 0:
+                                    server_channels = db.get_server_channels(server_id)
+                                    if len(server_channels) >= max_channels:
+                                        await websocket.send_str(json.dumps({
+                                            'type': 'error',
+                                            'message': f'Maximum channels per server ({max_channels}) reached'
+                                        }))
+                                        continue
+                                
                                 channel_id = get_next_channel_id()
                                 db.create_channel(channel_id, server_id, channel_name, channel_type)
                                 
@@ -1022,6 +1085,20 @@ async def handler(websocket):
                         
                         if db.get_server(server_id) and channel_name:
                             if has_permission(server_id, username, 'can_create_channel'):
+                                # Get admin settings for channel limits
+                                admin_settings = db.get_admin_settings()
+                                max_channels = admin_settings.get('max_channels_per_server', 50)
+                                
+                                # Check if server has reached channel limit (0 = unlimited)
+                                if max_channels > 0:
+                                    server_channels = db.get_server_channels(server_id)
+                                    if len(server_channels) >= max_channels:
+                                        await websocket.send_str(json.dumps({
+                                            'type': 'error',
+                                            'message': f'Maximum channels per server ({max_channels}) reached'
+                                        }))
+                                        continue
+                                
                                 channel_id = get_next_channel_id()
                                 db.create_channel(channel_id, server_id, channel_name, 'voice')
                                 
@@ -1145,6 +1222,11 @@ async def handler(websocket):
                         # Update user avatar (emoji or image upload)
                         avatar_type = data.get('avatar_type', 'emoji')
                         
+                        # Get admin settings for file size limits
+                        admin_settings = db.get_admin_settings()
+                        max_file_size_mb = admin_settings.get('max_file_size_mb', 10)
+                        max_file_size = max_file_size_mb * 1024 * 1024
+                        
                         user = db.get_user(username)
                         if user:
                             if avatar_type == 'emoji':
@@ -1155,10 +1237,10 @@ async def handler(websocket):
                                 avatar_data = data.get('avatar_data', '')
                                 
                                 # Validate size (base64 is ~33% larger than original)
-                                if len(avatar_data) > MAX_AVATAR_SIZE * 1.5:
+                                if len(avatar_data) > max_file_size * 1.5:
                                     await websocket.send_str(json.dumps({
                                         'type': 'error',
-                                        'message': 'Avatar image too large. Maximum size is 2MB.'
+                                        'message': f'Avatar image too large. Maximum size is {max_file_size_mb}MB.'
                                     }))
                                     continue
                                 

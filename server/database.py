@@ -157,6 +157,34 @@ class Database:
                         )
                     ''')
                     
+                    # Admin settings table
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS admin_settings (
+                            id INTEGER PRIMARY KEY DEFAULT 1,
+                            server_name VARCHAR(255) DEFAULT 'Decentra',
+                            server_description TEXT DEFAULT 'A decentralized chat platform',
+                            custom_invite_link VARCHAR(255) DEFAULT '',
+                            allow_registration BOOLEAN DEFAULT TRUE,
+                            require_invite BOOLEAN DEFAULT FALSE,
+                            max_message_length INTEGER DEFAULT 2000,
+                            max_file_size_mb INTEGER DEFAULT 10,
+                            allowed_file_types TEXT DEFAULT 'image/png,image/jpeg,image/gif,image/webp',
+                            max_servers_per_user INTEGER DEFAULT 100,
+                            max_channels_per_server INTEGER DEFAULT 50,
+                            max_members_per_server INTEGER DEFAULT 1000,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            CHECK (id = 1)
+                        )
+                    ''')
+                    
+                    # Insert default settings if table is empty
+                    cursor.execute('''
+                        INSERT INTO admin_settings (id) 
+                        VALUES (1) 
+                        ON CONFLICT (id) DO NOTHING
+                    ''')
+                    
                     conn.commit()
                 
                 # If we get here, connection was successful
@@ -230,6 +258,48 @@ class Database:
             if row:
                 return row['username']
             return None
+    
+    # Admin settings operations
+    def get_admin_settings(self) -> Dict:
+        """Get admin settings from database."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM admin_settings WHERE id = 1')
+            row = cursor.fetchone()
+            if row:
+                settings = dict(row)
+                # Remove internal fields
+                settings.pop('id', None)
+                settings.pop('created_at', None)
+                settings.pop('updated_at', None)
+                return settings
+            return {}
+    
+    def update_admin_settings(self, settings: Dict) -> bool:
+        """Update admin settings in database."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Build dynamic UPDATE query from settings dict
+                set_clauses = []
+                values = []
+                for key, value in settings.items():
+                    if key not in ['id', 'created_at', 'updated_at']:
+                        set_clauses.append(f"{key} = %s")
+                        values.append(value)
+                
+                # Add updated_at timestamp
+                set_clauses.append("updated_at = CURRENT_TIMESTAMP")
+                
+                if set_clauses:
+                    query = f"UPDATE admin_settings SET {', '.join(set_clauses)} WHERE id = 1"
+                    cursor.execute(query, values)
+                    return True
+                return False
+        except Exception as e:
+            print(f"Error updating admin settings: {e}")
+            return False
     
     # Server operations
     def create_server(self, server_id: str, name: str, owner: str) -> bool:
