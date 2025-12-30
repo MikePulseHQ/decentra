@@ -185,6 +185,33 @@ class Database:
                         ON CONFLICT (id) DO NOTHING
                     ''')
                     
+                    # Server roles table
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS server_roles (
+                            role_id VARCHAR(255) PRIMARY KEY,
+                            server_id VARCHAR(255) NOT NULL,
+                            name VARCHAR(255) NOT NULL,
+                            color VARCHAR(7) DEFAULT '#99AAB5',
+                            position INTEGER DEFAULT 0,
+                            permissions JSONB DEFAULT '{}',
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            FOREIGN KEY (server_id) REFERENCES servers(server_id) ON DELETE CASCADE
+                        )
+                    ''')
+                    
+                    # User roles junction table
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS user_roles (
+                            server_id VARCHAR(255) NOT NULL,
+                            username VARCHAR(255) NOT NULL,
+                            role_id VARCHAR(255) NOT NULL,
+                            PRIMARY KEY (server_id, username, role_id),
+                            FOREIGN KEY (server_id) REFERENCES servers(server_id) ON DELETE CASCADE,
+                            FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE,
+                            FOREIGN KEY (role_id) REFERENCES server_roles(role_id) ON DELETE CASCADE
+                        )
+                    ''')
+                    
                     conn.commit()
                 
                 # If we get here, connection was successful
@@ -414,6 +441,170 @@ class Database:
                 permissions.get('can_delete_channel', False),
                 server_id, username
             ))
+    
+    # Role operations
+    def create_role(self, role_id: str, server_id: str, name: str, color: str,
+                    position: int = 0, permissions: Dict = None) -> bool:
+        """Create a new server role."""
+        try:
+            if permissions is None:
+                permissions = {}
+            
+            print(f"[DB] Attempting to create role: id={role_id}, server={server_id}, name={name}", flush=True)
+            
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                print(f"[DB] Executing INSERT for role {role_id}", flush=True)
+                cursor.execute('''
+                    INSERT INTO server_roles (role_id, server_id, name, color, position, permissions)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                ''', (role_id, server_id, name, color, position, json.dumps(permissions)))
+                print(f"[DB] INSERT executed successfully", flush=True)
+                return True
+        except psycopg2.IntegrityError as e:
+            print(f"IntegrityError creating role: {e}", flush=True)
+            return False
+        except Exception as e:
+            print(f"Error creating role: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def get_server_roles(self, server_id: str) -> List[Dict]:
+        """Get all roles for a server."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT role_id, server_id, name, color, position, permissions, created_at
+                FROM server_roles
+                WHERE server_id = %s
+                ORDER BY position DESC
+            ''', (server_id,))
+            roles = []
+            for row in cursor.fetchall():
+                role = dict(row)
+                # Parse JSON permissions
+                if isinstance(role['permissions'], str):
+                    role['permissions'] = json.loads(role['permissions'])
+                roles.append(role)
+            return roles
+    
+    def get_role(self, role_id: str) -> Optional[Dict]:
+        """Get a specific role."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT role_id, server_id, name, color, position, permissions, created_at
+                FROM server_roles
+                WHERE role_id = %s
+            ''', (role_id,))
+            row = cursor.fetchone()
+            if row:
+                role = dict(row)
+                if isinstance(role['permissions'], str):
+                    role['permissions'] = json.loads(role['permissions'])
+                return role
+            return None
+    
+    def update_role(self, role_id: str, name: str = None, color: str = None, 
+                    position: int = None, permissions: Dict = None) -> bool:
+        """Update a role."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                updates = []
+                values = []
+                
+                if name is not None:
+                    updates.append("name = %s")
+                    values.append(name)
+                if color is not None:
+                    updates.append("color = %s")
+                    values.append(color)
+                if position is not None:
+                    updates.append("position = %s")
+                    values.append(position)
+                if permissions is not None:
+                    updates.append("permissions = %s")
+                    values.append(json.dumps(permissions))
+                
+                if updates:
+                    values.append(role_id)
+                    query = f"UPDATE server_roles SET {', '.join(updates)} WHERE role_id = %s"
+                    cursor.execute(query, values)
+                    return True
+                return False
+        except Exception as e:
+            print(f"Error updating role: {e}")
+            return False
+    
+    def delete_role(self, role_id: str) -> bool:
+        """Delete a role."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('DELETE FROM server_roles WHERE role_id = %s', (role_id,))
+                return True
+        except Exception as e:
+            print(f"Error deleting role: {e}")
+            return False
+    
+    def assign_role(self, server_id: str, username: str, role_id: str) -> bool:
+        """Assign a role to a user."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO user_roles (server_id, username, role_id)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (server_id, username, role_id) DO NOTHING
+                ''', (server_id, username, role_id))
+                return True
+        except Exception as e:
+            print(f"Error assigning role: {e}")
+            return False
+    
+    def remove_role_from_user(self, server_id: str, username: str, role_id: str) -> bool:
+        """Remove a role from a user."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    DELETE FROM user_roles
+                    WHERE server_id = %s AND username = %s AND role_id = %s
+                ''', (server_id, username, role_id))
+                return True
+        except Exception as e:
+            print(f"Error removing role: {e}")
+            return False
+    
+    def get_user_roles(self, server_id: str, username: str) -> List[Dict]:
+        """Get all roles assigned to a user in a server."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT r.role_id, r.server_id, r.name, r.color, r.position, r.permissions
+                FROM server_roles r
+                JOIN user_roles ur ON r.role_id = ur.role_id
+                WHERE ur.server_id = %s AND ur.username = %s
+                ORDER BY r.position DESC
+            ''', (server_id, username))
+            roles = []
+            for row in cursor.fetchall():
+                role = dict(row)
+                if isinstance(role['permissions'], str):
+                    role['permissions'] = json.loads(role['permissions'])
+                roles.append(role)
+            return roles
+    
+    def get_role_members(self, role_id: str) -> List[str]:
+        """Get all users assigned to a role."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT username FROM user_roles WHERE role_id = %s
+            ''', (role_id,))
+            return [row['username'] for row in cursor.fetchall()]
     
     # Message operations
     def save_message(self, username: str, content: str, context_type: str, context_id: Optional[str] = None) -> int:

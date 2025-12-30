@@ -1,5 +1,6 @@
 // Chat page JavaScript with Servers, DMs, and Friends support
 (function() {
+    console.log('chat.js loaded and executing');
     // Check if user is authenticated
     const username = sessionStorage.getItem('username');
     const password = sessionStorage.getItem('password');
@@ -100,6 +101,26 @@
     const createTextChannelBtn = document.getElementById('create-text-channel-btn');
     const createVoiceChannelBtn = document.getElementById('create-voice-channel-btn');
     
+    // Roles management elements
+    const rolesModal = document.getElementById('roles-modal');
+    const openRolesManagerBtn = document.getElementById('open-roles-manager-btn');
+    const closeRolesModalBtn = document.getElementById('close-roles-modal');
+    const createRoleBtn = document.getElementById('create-role-btn');
+    const rolesList = document.getElementById('roles-list');
+    const roleEditor = document.getElementById('role-editor');
+    const roleEditForm = document.getElementById('role-edit-form');
+    const roleNameInput = document.getElementById('role-name-input');
+    const roleColorInput = document.getElementById('role-color-input');
+    const roleColorPreview = document.getElementById('role-color-preview');
+    const saveRoleBtn = document.getElementById('save-role-btn');
+    const deleteRoleBtn = document.getElementById('delete-role-btn');
+    const cancelRoleBtn = document.getElementById('cancel-role-btn');
+    const roleMembersList = document.getElementById('role-members-list');
+    const assignRoleBtn = document.getElementById('assign-role-btn');
+    const assignRoleModal = document.getElementById('assign-role-modal');
+    const closeAssignModalBtn = document.getElementById('close-assign-modal');
+    const availableMembersList = document.getElementById('available-members-list');
+    
     // Voice elements
     const voiceControls = document.getElementById('voice-controls');
     const voiceStatusText = document.getElementById('voice-status-text');
@@ -143,6 +164,11 @@
     let currentlySelectedServer = null;
     let currentAvatar = '👤';
     let isMembersSidebarCollapsed = false;
+    
+    // Roles management state
+    let serverRoles = [];
+    let currentEditingRole = null;
+    let isCreatingNewRole = false;
     
     // Connect to WebSocket
     function connect() {
@@ -613,6 +639,64 @@
             case 'webrtc_ice_candidate':
                 if (voiceChat) {
                     voiceChat.handleIceCandidate(data.from, data.candidate);
+                }
+                break;
+            
+            // Role management messages
+            case 'server_roles':
+                serverRoles = data.roles || [];
+                console.log('Received server_roles:', serverRoles);
+                displayRolesList();
+                break;
+            
+            case 'role_created':
+                console.log('role_created message received:', data);
+                console.log('currentlySelectedServer:', currentlySelectedServer);
+                console.log('data.server_id:', data.server_id);
+                if (currentlySelectedServer === data.server_id) {
+                    serverRoles.push(data.role);
+                    console.log('Role created, serverRoles now:', serverRoles);
+                    displayRolesList();
+                } else {
+                    console.log('Role not added - server mismatch');
+                }
+                break;
+            
+            case 'role_updated':
+                if (currentlySelectedServer === data.server_id) {
+                    const index = serverRoles.findIndex(r => r.role_id === data.role.role_id);
+                    if (index !== -1) {
+                        serverRoles[index] = data.role;
+                        displayRolesList();
+                        if (currentEditingRole && currentEditingRole.role_id === data.role.role_id) {
+                            loadRoleForEditing(data.role);
+                        }
+                    }
+                }
+                break;
+            
+            case 'role_deleted':
+                if (currentlySelectedServer === data.server_id) {
+                    serverRoles = serverRoles.filter(r => r.role_id !== data.role_id);
+                    displayRolesList();
+                    if (currentEditingRole && currentEditingRole.role_id === data.role_id) {
+                        cancelRoleEdit();
+                    }
+                }
+                break;
+            
+            case 'role_assigned':
+            case 'role_removed':
+                // Refresh the current role's member list if viewing
+                if (currentEditingRole) {
+                    loadRoleMembersList(currentEditingRole.role_id);
+                }
+                break;
+            
+            case 'member_role_updated':
+                // Refresh the role's member list if viewing that role
+                if (currentEditingRole && currentEditingRole.role_id === data.role_id) {
+                    loadRoleMembersList(data.role_id);
                 }
                 break;
         }
@@ -2082,6 +2166,295 @@
         return div.innerHTML;
     }
     
+    // ========== Roles Management Functions ==========
+    
+    console.log('Setting up roles management listeners');
+    console.log('openRolesManagerBtn:', openRolesManagerBtn);
+    console.log('rolesModal:', rolesModal);
+    console.log('rolesList:', rolesList);
+    
+    // Open roles manager
+    openRolesManagerBtn.addEventListener('click', () => {
+        console.log('Roles button clicked, currentlySelectedServer:', currentlySelectedServer);
+        if (!currentlySelectedServer) return;
+        
+        // Request roles from server
+        console.log('Sending get_server_roles request');
+        ws.send(JSON.stringify({
+            type: 'get_server_roles',
+            server_id: currentlySelectedServer
+        }));
+        
+        serverSettingsModal.classList.add('hidden');
+        rolesModal.classList.remove('hidden');
+        console.log('Roles modal should be visible now');
+    });
+    
+    // Close roles modal
+    closeRolesModalBtn.addEventListener('click', () => {
+        rolesModal.classList.add('hidden');
+        cancelRoleEdit();
+    });
+    
+    // Display roles list
+    function displayRolesList() {
+        console.log('displayRolesList called with:', serverRoles);
+        console.log('rolesList element:', rolesList);
+        console.log('Number of roles:', serverRoles.length);
+        rolesList.innerHTML = '';
+        
+        if (serverRoles.length === 0) {
+            console.log('No roles to display');
+            return;
+        }
+        
+        serverRoles.forEach((role, index) => {
+            console.log(`Creating role item ${index}:`, role);
+            const roleItem = document.createElement('div');
+            roleItem.className = 'role-item';
+            roleItem.dataset.roleId = role.role_id;
+            
+            const colorDot = document.createElement('div');
+            colorDot.className = 'role-color-dot';
+            colorDot.style.background = role.color;
+            
+            const roleName = document.createElement('span');
+            roleName.className = 'role-item-name';
+            roleName.textContent = role.name;
+            
+            roleItem.appendChild(colorDot);
+            roleItem.appendChild(roleName);
+            
+            roleItem.addEventListener('click', () => {
+                // Remove active from all
+                document.querySelectorAll('.role-item').forEach(r => r.classList.remove('active'));
+                roleItem.classList.add('active');
+                loadRoleForEditing(role);
+            });
+            
+            rolesList.appendChild(roleItem);
+            console.log(`Added role item to list:`, roleItem);
+        });
+        
+        console.log('Final rolesList children:', rolesList.children.length);
+    }
+    
+    // Create new role
+    createRoleBtn.addEventListener('click', () => {
+        console.log('Create role button clicked');
+        isCreatingNewRole = true;
+        currentEditingRole = {
+            name: '',
+            color: '#99AAB5',
+            permissions: {}
+        };
+        
+        // Show edit form
+        roleEditor.classList.add('hidden');
+        roleEditForm.classList.remove('hidden');
+        
+        // Reset form
+        roleNameInput.value = '';
+        roleColorInput.value = '#99AAB5';
+        roleColorPreview.style.background = '#99AAB5';
+        roleColorPreview.textContent = 'Preview';
+        
+        // Clear all permissions
+        document.querySelectorAll('.permission-checkbox').forEach(cb => cb.checked = false);
+        
+        // Clear members list
+        roleMembersList.innerHTML = '<p style="color: #72767d; font-size: 12px;">No members yet</p>';
+        
+        // Hide delete button for new role
+        deleteRoleBtn.style.display = 'none';
+        assignRoleBtn.style.display = 'none';
+    });
+    
+    // Load role for editing
+    function loadRoleForEditing(role) {
+        isCreatingNewRole = false;
+        currentEditingRole = role;
+        
+        // Show edit form
+        roleEditor.classList.add('hidden');
+        roleEditForm.classList.remove('hidden');
+        
+        // Populate form
+        roleNameInput.value = role.name;
+        roleColorInput.value = role.color;
+        roleColorPreview.style.background = role.color;
+        roleColorPreview.textContent = role.name;
+        
+        // Set permissions
+        document.querySelectorAll('.permission-checkbox').forEach(cb => {
+            const permission = cb.dataset.permission;
+            cb.checked = role.permissions[permission] || false;
+        });
+        
+        // Load members
+        loadRoleMembersList(role.role_id);
+        
+        // Show delete and assign buttons
+        deleteRoleBtn.style.display = 'inline-block';
+        assignRoleBtn.style.display = 'inline-block';
+    }
+    
+    // Load role members list
+    function loadRoleMembersList(roleId) {
+        // Request members with this role
+        ws.send(JSON.stringify({
+            type: 'get_server_members',
+            server_id: currentlySelectedServer
+        }));
+        
+        // The response will populate server members, then we filter by role
+        // For now, show placeholder
+        roleMembersList.innerHTML = '<p style="color: #72767d; font-size: 12px;">Loading members...</p>';
+    }
+    
+    // Update color preview when color changes
+    roleColorInput.addEventListener('input', (e) => {
+        roleColorPreview.style.background = e.target.value;
+        if (roleNameInput.value) {
+            roleColorPreview.textContent = roleNameInput.value;
+        }
+    });
+    
+    roleNameInput.addEventListener('input', (e) => {
+        if (e.target.value) {
+            roleColorPreview.textContent = e.target.value;
+        } else {
+            roleColorPreview.textContent = 'Preview';
+        }
+    });
+    
+    // Save role
+    saveRoleBtn.addEventListener('click', () => {
+        console.log('Save role button clicked');
+        const name = roleNameInput.value.trim();
+        if (!name) {
+            alert('Please enter a role name');
+            return;
+        }
+        
+        const color = roleColorInput.value;
+        const permissions = {};
+        
+        // Collect permissions
+        document.querySelectorAll('.permission-checkbox').forEach(cb => {
+            permissions[cb.dataset.permission] = cb.checked;
+        });
+        
+        if (isCreatingNewRole) {
+            // Create new role
+            console.log('Sending create_role message:', { name, color, permissions });
+            ws.send(JSON.stringify({
+                type: 'create_role',
+                server_id: currentlySelectedServer,
+                name: name,
+                color: color,
+                permissions: permissions
+            }));
+        } else {
+            // Update existing role
+            ws.send(JSON.stringify({
+                type: 'update_role',
+                role_id: currentEditingRole.role_id,
+                name: name,
+                color: color,
+                permissions: permissions
+            }));
+        }
+        
+        cancelRoleEdit();
+    });
+    
+    // Delete role
+    deleteRoleBtn.addEventListener('click', () => {
+        if (!currentEditingRole || !currentEditingRole.role_id) return;
+        
+        if (confirm(`Are you sure you want to delete the role "${currentEditingRole.name}"?`)) {
+            ws.send(JSON.stringify({
+                type: 'delete_role',
+                role_id: currentEditingRole.role_id
+            }));
+        }
+    });
+    
+    // Cancel role edit
+    function cancelRoleEdit() {
+        isCreatingNewRole = false;
+        currentEditingRole = null;
+        roleEditor.classList.remove('hidden');
+        roleEditForm.classList.add('hidden');
+        
+        // Deselect all role items
+        document.querySelectorAll('.role-item').forEach(r => r.classList.remove('active'));
+    }
+    
+    cancelRoleBtn.addEventListener('click', cancelRoleEdit);
+    
+    // Assign role to members
+    assignRoleBtn.addEventListener('click', () => {
+        if (!currentEditingRole) return;
+        
+        // Get server members
+        ws.send(JSON.stringify({
+            type: 'get_server_members',
+            server_id: currentlySelectedServer
+        }));
+        
+        assignRoleModal.classList.remove('hidden');
+        loadAvailableMembers();
+    });
+    
+    // Load available members for role assignment
+    function loadAvailableMembers() {
+        // This will be populated when we receive server members
+        availableMembersList.innerHTML = '<p style="color: #72767d;">Loading members...</p>';
+    }
+    
+    // Close assign modal
+    closeAssignModalBtn.addEventListener('click', () => {
+        assignRoleModal.classList.add('hidden');
+    });
+    
+    // Populate available members when server members are loaded
+    window.populateAvailableMembersForRole = function(members) {
+        if (!currentEditingRole) return;
+        
+        availableMembersList.innerHTML = '';
+        
+        members.forEach(member => {
+            const memberItem = document.createElement('div');
+            memberItem.className = 'available-member-item';
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = member.username;
+            
+            const addBtn = document.createElement('button');
+            addBtn.className = 'add-member-btn';
+            addBtn.textContent = 'Add to Role';
+            
+            addBtn.addEventListener('click', () => {
+                ws.send(JSON.stringify({
+                    type: 'assign_role',
+                    server_id: currentlySelectedServer,
+                    username: member.username,
+                    role_id: currentEditingRole.role_id
+                }));
+                
+                addBtn.disabled = true;
+                addBtn.textContent = 'Added';
+            });
+            
+            memberItem.appendChild(nameSpan);
+            memberItem.appendChild(addBtn);
+            availableMembersList.appendChild(memberItem);
+        });
+    };
+    
+    console.log('chat.js: About to call connect()');
     // Initialize connection
     connect();
 })();

@@ -41,11 +41,22 @@ voice_members = {}
 server_counter = 0
 channel_counter = 0
 dm_counter = 0
+role_counter = 0
 
 
 def hash_password(password):
     """Hash a password using bcrypt."""
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+
+def serialize_role(role):
+    """Serialize a role dict for JSON transmission, converting datetime to string."""
+    if not role:
+        return None
+    serialized = role.copy()
+    if 'created_at' in serialized and serialized['created_at']:
+        serialized['created_at'] = serialized['created_at'].isoformat()
+    return serialized
 
 
 def verify_password(password, password_hash):
@@ -73,6 +84,13 @@ def get_next_channel_id():
     return f"channel_{channel_counter}"
 
 
+def get_next_role_id():
+    """Get next role ID."""
+    global role_counter
+    role_counter += 1
+    return f"role_{role_counter}"
+
+
 def get_next_dm_id():
     """Get next DM ID."""
     global dm_counter
@@ -82,7 +100,7 @@ def get_next_dm_id():
 
 def init_counters_from_db():
     """Initialize ID counters from database."""
-    global server_counter, channel_counter, dm_counter
+    global server_counter, channel_counter, dm_counter, role_counter
     
     # Get highest server ID
     servers = db.get_all_servers()
@@ -108,6 +126,24 @@ def init_counters_from_db():
         if dm_ids:
             max_dm = max([int(d.split('_')[1]) for d in dm_ids] + [0])
             dm_counter = max_dm
+    
+    # Get highest role ID
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT role_id FROM server_roles')
+        role_ids = [row['role_id'] for row in cursor.fetchall()]
+        if role_ids:
+            # Handle both formats: "role_1" and "role_server_1_server_2"
+            max_role = 0
+            for rid in role_ids:
+                parts = rid.split('_')
+                # If it's the new format "role_N", get the number
+                if len(parts) == 2 and parts[1].isdigit():
+                    max_role = max(max_role, int(parts[1]))
+                # If it's the old format "role_server_X_server_Y", get the last number
+                elif len(parts) > 2 and parts[-1].isdigit():
+                    max_role = max(max_role, int(parts[-1]))
+            role_counter = max_role
 
 
 def get_next_call_id():
@@ -142,9 +178,10 @@ def get_avatar_data(username):
 
 
 def has_permission(server_id, username, permission):
-    """Check if user has specific permission in a server.
+    """Check if user has specific permission in a server through roles.
     Owner always has all permissions.
-    Permission can be: 'can_create_channel', 'can_edit_channel', 'can_delete_channel'
+    Permission can be: 'create_invite', 'create_channel', 'create_voice_channel', 
+                       'delete_messages', 'edit_messages', 'send_files', 'access_settings'
     """
     server = db.get_server(server_id)
     if not server:
@@ -154,11 +191,19 @@ def has_permission(server_id, username, permission):
     if server['owner'] == username:
         return True
     
-    # Check user's specific permissions from database
-    members = db.get_server_members(server_id)
-    for member in members:
-        if member['username'] == username:
-            return member.get(permission, False)
+    # Check user's roles for the permission
+    user_roles = db.get_user_roles(server_id, username)
+    for role in user_roles:
+        # Check if role has the requested permission
+        if role.get('permissions', {}).get(permission, False):
+            return True
+    
+    # Legacy: Check old permission system for backward compatibility
+    if permission in ['can_create_channel', 'can_edit_channel', 'can_delete_channel']:
+        members = db.get_server_members(server_id)
+        for member in members:
+            if member['username'] == username:
+                return member.get(permission, False)
     
     # Default: no permission
     return False
@@ -448,6 +493,7 @@ async def handler(websocket):
             if msg.type == web.WSMsgType.TEXT:
                 try:
                     data = json.loads(msg.data)
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Received message type: {data.get('type')}", flush=True)
                     
                     if data.get('type') == 'message':
                         msg_content = data.get('content', '')
@@ -867,7 +913,7 @@ async def handler(websocket):
                         
                         server = db.get_server(server_id)
                         if server and new_name:
-                            if username == server['owner']:
+                            if has_permission(server_id, username, 'access_settings'):
                                 old_name = server['name']
                                 db.update_server_name(server_id, new_name)
                                 
@@ -881,16 +927,14 @@ async def handler(websocket):
                             else:
                                 await websocket.send_str(json.dumps({
                                     'type': 'error',
-                                    'message': 'Only the server owner can rename the server'
+                                    'message': 'You do not have permission to access server settings'
                                 }))
                     
                     elif data.get('type') == 'generate_server_invite':
                         server_id = data.get('server_id', '')
                         
-                        # Check if user is member of server
-                        members = db.get_server_members(server_id)
-                        member_usernames = {m['username'] for m in members}
-                        if username in member_usernames:
+                        # Check if user has permission to create invites
+                        if has_permission(server_id, username, 'create_invite'):
                             invite_code = generate_invite_code()
                             db.create_invite_code(invite_code, username, 'server', server_id)
                             
@@ -901,6 +945,11 @@ async def handler(websocket):
                                 'message': f'Server invite code generated: {invite_code}'
                             }))
                             print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} generated invite for server {server_id}: {invite_code}")
+                        else:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'You do not have permission to create server invites'
+                            }))
                     
                     elif data.get('type') == 'join_server_with_invite':
                         invite_code = data.get('invite_code', '').strip()
@@ -1039,6 +1088,193 @@ async def handler(websocket):
                                     'members': members_list
                                 }))
                     
+                    # Role management handlers
+                    elif data.get('type') == 'create_role':
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Received create_role request from {username}", flush=True)
+                        server_id = data.get('server_id', '')
+                        role_name = data.get('name', '').strip()
+                        color = data.get('color', '#99AAB5')
+                        permissions = data.get('permissions', {})
+                        
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] server_id={server_id}, role_name={role_name}, color={color}", flush=True)
+                        
+                        server = db.get_server(server_id)
+                        if server and role_name:
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] Server found, checking ownership")
+                            if username == server['owner']:
+                                print(f"[{datetime.now().strftime('%H:%M:%S')}] User is owner, creating role")
+                                role_id = get_next_role_id()
+                                
+                                # Get highest position and add 1
+                                existing_roles = db.get_server_roles(server_id)
+                                position = max([r['position'] for r in existing_roles] + [0]) + 1
+                                
+                                print(f"[{datetime.now().strftime('%H:%M:%S')}] Creating role with position {position}")
+                                if db.create_role(role_id, server_id, role_name, color, position, permissions):
+                                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Role created in DB, fetching...")
+                                    role = db.get_role(role_id)
+                                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Role fetched: {role}")
+                                    
+                                    # Broadcast to all server members
+                                    serialized_role = serialize_role(role)
+                                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Serialized role: {serialized_role}")
+                                    await broadcast_to_server(server_id, json.dumps({
+                                        'type': 'role_created',
+                                        'server_id': server_id,
+                                        'role': serialized_role
+                                    }))
+                                    print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} created role {role_name} in server {server_id}")
+                                else:
+                                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Failed to create role in DB")
+                            else:
+                                print(f"[{datetime.now().strftime('%H:%M:%S')}] User {username} is not owner of server")
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': 'Only the server owner can create roles'
+                                }))
+                        else:
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] Server not found or role_name empty")
+
+                    
+                    elif data.get('type') == 'update_role':
+                        role_id = data.get('role_id', '')
+                        role_name = data.get('name')
+                        color = data.get('color')
+                        permissions = data.get('permissions')
+                        
+                        role = db.get_role(role_id)
+                        if role:
+                            server = db.get_server(role['server_id'])
+                            if server and username == server['owner']:
+                                if db.update_role(role_id, role_name, color, None, permissions):
+                                    updated_role = db.get_role(role_id)
+                                    
+                                    # Broadcast to all server members
+                                    await broadcast_to_server(role['server_id'], json.dumps({
+                                        'type': 'role_updated',
+                                        'server_id': role['server_id'],
+                                        'role': serialize_role(updated_role)
+                                    }))
+                                    print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} updated role {role_id}")
+                            else:
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': 'Only the server owner can update roles'
+                                }))
+                    
+                    elif data.get('type') == 'delete_role':
+                        role_id = data.get('role_id', '')
+                        
+                        role = db.get_role(role_id)
+                        if role:
+                            server = db.get_server(role['server_id'])
+                            if server and username == server['owner']:
+                                if db.delete_role(role_id):
+                                    # Broadcast to all server members
+                                    await broadcast_to_server(role['server_id'], json.dumps({
+                                        'type': 'role_deleted',
+                                        'server_id': role['server_id'],
+                                        'role_id': role_id
+                                    }))
+                                    print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} deleted role {role_id}")
+                            else:
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': 'Only the server owner can delete roles'
+                                }))
+                    
+                    elif data.get('type') == 'assign_role':
+                        server_id = data.get('server_id', '')
+                        target_username = data.get('username', '')
+                        role_id = data.get('role_id', '')
+                        
+                        server = db.get_server(server_id)
+                        role = db.get_role(role_id)
+                        if server and role and username == server['owner']:
+                            if db.assign_role(server_id, target_username, role_id):
+                                # Notify the user who got the role
+                                await send_to_user(target_username, json.dumps({
+                                    'type': 'role_assigned',
+                                    'server_id': server_id,
+                                    'role': role
+                                }))
+                                
+                                # Broadcast to server
+                                await broadcast_to_server(server_id, json.dumps({
+                                    'type': 'member_role_updated',
+                                    'server_id': server_id,
+                                    'username': target_username,
+                                    'role_id': role_id,
+                                    'action': 'added'
+                                }))
+                                print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} assigned role {role_id} to {target_username}")
+                        else:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'Only the server owner can assign roles'
+                            }))
+                    
+                    elif data.get('type') == 'remove_role_from_user':
+                        server_id = data.get('server_id', '')
+                        target_username = data.get('username', '')
+                        role_id = data.get('role_id', '')
+                        
+                        server = db.get_server(server_id)
+                        if server and username == server['owner']:
+                            if db.remove_role_from_user(server_id, target_username, role_id):
+                                # Notify the user
+                                await send_to_user(target_username, json.dumps({
+                                    'type': 'role_removed',
+                                    'server_id': server_id,
+                                    'role_id': role_id
+                                }))
+                                
+                                # Broadcast to server
+                                await broadcast_to_server(server_id, json.dumps({
+                                    'type': 'member_role_updated',
+                                    'server_id': server_id,
+                                    'username': target_username,
+                                    'role_id': role_id,
+                                    'action': 'removed'
+                                }))
+                                print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} removed role {role_id} from {target_username}")
+                        else:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'Only the server owner can remove roles'
+                            }))
+                    
+                    elif data.get('type') == 'get_server_roles':
+                        server_id = data.get('server_id', '')
+                        
+                        server = db.get_server(server_id)
+                        if server:
+                            # Verify user is a member
+                            members = db.get_server_members(server_id)
+                            member_usernames = {m['username'] for m in members}
+                            
+                            if username in member_usernames:
+                                roles = db.get_server_roles(server_id)
+                                await websocket.send_str(json.dumps({
+                                    'type': 'server_roles',
+                                    'server_id': server_id,
+                                    'roles': [serialize_role(r) for r in roles]
+                                }))
+                    
+                    elif data.get('type') == 'get_user_roles':
+                        server_id = data.get('server_id', '')
+                        target_username = data.get('username', username)
+                        
+                        server = db.get_server(server_id)
+                        if server:
+                            roles = db.get_user_roles(server_id, target_username)
+                            await websocket.send_str(json.dumps({
+                                'type': 'user_roles',
+                                'server_id': server_id,
+                                'username': target_username,
+                                'roles': [serialize_role(r) for r in roles]
+                            }))
+                    
                     # Channel creation handlers
                     elif data.get('type') == 'create_channel':
                         server_id = data.get('server_id', '')
@@ -1046,7 +1282,7 @@ async def handler(websocket):
                         channel_type = data.get('channel_type', 'text')  # Default to text channel
                         
                         if db.get_server(server_id) and channel_name:
-                            if has_permission(server_id, username, 'can_create_channel'):
+                            if has_permission(server_id, username, 'create_channel'):
                                 # Get admin settings for channel limits
                                 admin_settings = db.get_admin_settings()
                                 max_channels = admin_settings.get('max_channels_per_server', 50)
@@ -1084,7 +1320,7 @@ async def handler(websocket):
                         channel_name = data.get('name', '').strip()
                         
                         if db.get_server(server_id) and channel_name:
-                            if has_permission(server_id, username, 'can_create_channel'):
+                            if has_permission(server_id, username, 'create_voice_channel'):
                                 # Get admin settings for channel limits
                                 admin_settings = db.get_admin_settings()
                                 max_channels = admin_settings.get('max_channels_per_server', 50)
@@ -1529,7 +1765,7 @@ async def main():
     
     # Initialize database counters from existing data
     init_counters_from_db()
-    print(f"Initialized counters from database (servers: {server_counter}, channels: {channel_counter}, dms: {dm_counter})")
+    print(f"Initialized counters from database (servers: {server_counter}, channels: {channel_counter}, dms: {dm_counter}, roles: {role_counter})")
     
     # Create aiohttp application
     app = web.Application()

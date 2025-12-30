@@ -245,6 +245,7 @@
                 <button class="settings-tab active" data-tab="general">General</button>
                 <button class="settings-tab" data-tab="channels">Channels</button>
                 <button class="settings-tab" data-tab="invites">Invites</button>
+                <button class="settings-tab" data-tab="roles">Roles</button>
                 <button class="settings-tab" data-tab="permissions">Permissions</button>
             </div>
             
@@ -277,6 +278,12 @@
                 <div id="server-invite-display" class="invite-code-display hidden">
                     <code id="server-invite-code-text"></code>
                 </div>
+            </div>
+            
+            <div id="settings-tab-roles" class="settings-tab-content hidden">
+                <h4>Server Roles</h4>
+                <p>Manage roles and permissions for your server members.</p>
+                <button id="open-roles-manager-btn" class="btn btn-primary">Manage Roles</button>
             </div>
             
             <div id="settings-tab-permissions" class="settings-tab-content hidden">
@@ -370,6 +377,133 @@
             </div>
             
             <button id="close-device-settings-modal" class="btn btn-secondary">Close</button>
+        </div>
+    </div>
+    
+    <!-- Roles Management Modal -->
+    <div id="roles-modal" class="modal hidden">
+        <div class="modal-content modal-content-large">
+            <h3>Server Roles</h3>
+            <div class="roles-container">
+                <div class="roles-sidebar">
+                    <div class="roles-header">
+                        <h4>Roles</h4>
+                        <button id="create-role-btn" class="btn btn-small btn-primary">+ Create Role</button>
+                    </div>
+                    <div id="roles-list" class="roles-list">
+                        <!-- Roles will be listed here -->
+                    </div>
+                </div>
+                
+                <div class="role-editor" id="role-editor">
+                    <div class="role-editor-placeholder">
+                        <p>Select a role to edit or create a new one</p>
+                    </div>
+                </div>
+                
+                <div class="role-editor hidden" id="role-edit-form">
+                    <div class="form-group">
+                        <label for="role-name-input">Role Name</label>
+                        <input type="text" id="role-name-input" placeholder="Enter role name">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="role-color-input">Role Color</label>
+                        <div class="color-picker-container">
+                            <input type="color" id="role-color-input" value="#99AAB5">
+                            <span id="role-color-preview" class="role-color-preview"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Permissions</label>
+                        <div class="permissions-list">
+                            <div class="permission-item">
+                                <label>
+                                    <input type="checkbox" id="perm-create-invite" class="permission-checkbox" data-permission="create_invite">
+                                    <span>Create Server Invites</span>
+                                </label>
+                                <p class="permission-desc">Allow members to invite new people to the server</p>
+                            </div>
+                            
+                            <div class="permission-item">
+                                <label>
+                                    <input type="checkbox" id="perm-create-channel" class="permission-checkbox" data-permission="create_channel">
+                                    <span>Create Channels</span>
+                                </label>
+                                <p class="permission-desc">Allow members to create text channels</p>
+                            </div>
+                            
+                            <div class="permission-item">
+                                <label>
+                                    <input type="checkbox" id="perm-create-voice" class="permission-checkbox" data-permission="create_voice_channel">
+                                    <span>Create Voice Channels</span>
+                                </label>
+                                <p class="permission-desc">Allow members to create voice channels</p>
+                            </div>
+                            
+                            <div class="permission-item">
+                                <label>
+                                    <input type="checkbox" id="perm-delete-messages" class="permission-checkbox" data-permission="delete_messages">
+                                    <span>Delete Messages</span>
+                                </label>
+                                <p class="permission-desc">Allow members to delete messages from others</p>
+                            </div>
+                            
+                            <div class="permission-item">
+                                <label>
+                                    <input type="checkbox" id="perm-edit-messages" class="permission-checkbox" data-permission="edit_messages">
+                                    <span>Edit Messages</span>
+                                </label>
+                                <p class="permission-desc">Allow members to edit messages from others</p>
+                            </div>
+                            
+                            <div class="permission-item">
+                                <label>
+                                    <input type="checkbox" id="perm-send-files" class="permission-checkbox" data-permission="send_files">
+                                    <span>Send Files</span>
+                                </label>
+                                <p class="permission-desc">Allow members to upload and send files</p>
+                            </div>
+                            
+                            <div class="permission-item">
+                                <label>
+                                    <input type="checkbox" id="perm-access-settings" class="permission-checkbox" data-permission="access_settings">
+                                    <span>Access Server Settings</span>
+                                </label>
+                                <p class="permission-desc">Allow members to access and modify server settings</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Members with this role</label>
+                        <div id="role-members-list" class="role-members-list">
+                            <!-- Members will be listed here -->
+                        </div>
+                        <button id="assign-role-btn" class="btn btn-small btn-secondary">Add Members</button>
+                    </div>
+                    
+                    <div class="button-group">
+                        <button id="save-role-btn" class="btn btn-primary">Save Role</button>
+                        <button id="delete-role-btn" class="btn btn-danger">Delete Role</button>
+                        <button id="cancel-role-btn" class="btn btn-secondary">Cancel</button>
+                    </div>
+                </div>
+            </div>
+            
+            <button id="close-roles-modal" class="btn btn-secondary" style="margin-top: 20px;">Close</button>
+        </div>
+    </div>
+    
+    <!-- Assign Role to Members Modal -->
+    <div id="assign-role-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Add Members to Role</h3>
+            <div id="available-members-list" class="available-members-list">
+                <!-- Available members will be listed here -->
+            </div>
+            <button id="close-assign-modal" class="btn btn-secondary">Close</button>
         </div>
     </div>
     
