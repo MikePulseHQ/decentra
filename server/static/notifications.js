@@ -3,8 +3,13 @@
 
 class NotificationManager {
     constructor() {
-        this.notificationsEnabled = localStorage.getItem('notificationsEnabled') !== 'false';
-        this.soundsEnabled = localStorage.getItem('notificationSoundsEnabled') !== 'false';
+        // Load settings from localStorage with proper boolean conversion
+        const notifEnabled = localStorage.getItem('notificationsEnabled');
+        this.notificationsEnabled = notifEnabled === null ? true : notifEnabled === 'true';
+        
+        const soundsEnabled = localStorage.getItem('notificationSoundsEnabled');
+        this.soundsEnabled = soundsEnabled === null ? true : soundsEnabled === 'true';
+        
         this.messageSound = localStorage.getItem('messageSound') || 'soft-ping';
         this.callSound = localStorage.getItem('callSound') || 'classic-ring';
         this.audioContext = null;
@@ -294,7 +299,11 @@ class NotificationManager {
 
     notifyNewMessage(sender, message) {
         // Only show notification if page is not visible
-        const isVisible = document.visibilityState === 'visible';
+        // Use Page Visibility API with feature detection
+        const isVisible = typeof document.visibilityState !== 'undefined' 
+            ? document.visibilityState === 'visible' 
+            : true;
+            
         if (!isVisible) {
             this.showNotification(
                 `New message from ${sender}`,

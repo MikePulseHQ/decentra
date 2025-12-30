@@ -2223,13 +2223,14 @@
     
     testCallSoundBtn.addEventListener('click', () => {
         if (notificationManager) {
+            const CALL_SOUND_TEST_DURATION = 3000; // 3 seconds
             notificationManager.playSound('call', callSoundSelect.value);
-            // Stop the call sound after 3 seconds for testing
+            // Stop the call sound after a short duration for testing
             setTimeout(() => {
                 if (notificationManager) {
                     notificationManager.stopCallSound();
                 }
-            }, 3000);
+            }, CALL_SOUND_TEST_DURATION);
         }
     });
     
