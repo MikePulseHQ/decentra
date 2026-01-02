@@ -1798,9 +1798,9 @@
                 return;
             }
             
-            // Validate file size (2MB)
-            if (file.size > 2 * 1024 * 1024) {
-                alert('Image is too large. Maximum size is 2MB.');
+            // Validate file size (10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                alert('Image is too large. Maximum size is 10MB.');
                 return;
             }
             
