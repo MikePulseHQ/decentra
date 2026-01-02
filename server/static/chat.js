@@ -141,11 +141,15 @@
     const acceptCallBtn = document.getElementById('accept-call-btn');
     const rejectCallBtn = document.getElementById('reject-call-btn');
     
+    // Video call area
+    const videoCallArea = document.getElementById('video-call-area');
+    const videoGrid = document.getElementById('video-grid');
+    const maximizedVideoContainer = document.getElementById('maximized-video-container');
+    const minimizeVideoBtn = document.getElementById('minimize-video-btn');
+    
     // Voice participants panel
     const voiceParticipants = document.getElementById('voice-participants');
     const participantsList = document.getElementById('participants-list');
-    const remoteVideos = document.getElementById('remote-videos');
-    const closeParticipantsBtn = document.getElementById('close-participants-btn');
     
     // Screen share settings modal
     const screenShareSettingsModal = document.getElementById('screen-share-settings-modal');
@@ -2138,15 +2142,7 @@
         
         // Apply layout changes for call UI
         mainContainer.classList.add('in-voice-call');
-        voiceParticipants.classList.add('active');
-        voiceParticipants.classList.remove('hidden');
-        
-        // Collapse members sidebar if visible
-        if (!rightSidebar.classList.contains('hidden')) {
-            rightSidebar.classList.add('collapsed');
-            toggleMembersBtn.textContent = '▶';
-            toggleMembersBtn.title = 'Expand';
-        }
+        videoCallArea.classList.remove('hidden');
     }
     
     function hideVoiceControls() {
@@ -2154,21 +2150,12 @@
         
         // Remove layout changes
         mainContainer.classList.remove('in-voice-call');
-        voiceParticipants.classList.remove('active');
-        voiceParticipants.classList.add('hidden');
-        
-        // Restore members sidebar if it was visible before the call
-        // Only restore if we're currently viewing a server
-        if (currentlySelectedServer) {
-            if (!rightSidebar.classList.contains('hidden')) {
-                rightSidebar.classList.remove('collapsed');
-                toggleMembersBtn.textContent = '◀';
-                toggleMembersBtn.title = 'Collapse';
-            }
-        }
+        videoCallArea.classList.add('hidden');
         
         // Clear video elements
-        remoteVideos.innerHTML = '';
+        videoGrid.innerHTML = '';
+        maximizedVideoContainer.innerHTML = '';
+        maximizedVideoContainer.classList.add('hidden');
     }
     
     // Voice control event listeners
@@ -2570,19 +2557,6 @@
         }
     });
     
-    // Close voice participants panel
-    closeParticipantsBtn.addEventListener('click', () => {
-        // Hide the participants panel
-        voiceParticipants.classList.add('hidden');
-        voiceParticipants.classList.remove('active');
-
-        // Restore layout by removing the in-voice-call state from the main container
-        const inVoiceCallContainer = document.querySelector('.in-voice-call');
-        if (inVoiceCallContainer) {
-            inVoiceCallContainer.classList.remove('in-voice-call');
-        }
-    });
-    
     // Populate device selects
     async function populateDeviceSelects() {
         if (!voiceChat) return;
@@ -2708,6 +2682,41 @@
             toggleMembersBtn.title = 'Collapse';
         }
     });
+    
+    // Maximize/minimize video functionality
+    let currentMaximizedVideo = null;
+    
+    function maximizeVideo(videoElement, username, isScreenShare) {
+        // Clone the video element
+        const clonedVideo = videoElement.cloneNode(true);
+        clonedVideo.srcObject = videoElement.srcObject;
+        
+        // Clear and populate maximized container
+        maximizedVideoContainer.innerHTML = '';
+        
+        const label = document.createElement('div');
+        label.className = 'video-label';
+        label.textContent = isScreenShare ? `${username} (Screen)` : username;
+        label.style.fontSize = '18px';
+        label.style.padding = '10px 20px';
+        
+        maximizedVideoContainer.appendChild(clonedVideo);
+        maximizedVideoContainer.appendChild(label);
+        maximizedVideoContainer.appendChild(minimizeVideoBtn);
+        maximizedVideoContainer.classList.remove('hidden');
+        
+        currentMaximizedVideo = { videoElement, username, isScreenShare };
+    }
+    
+    function minimizeVideo() {
+        maximizedVideoContainer.classList.add('hidden');
+        maximizedVideoContainer.innerHTML = '';
+        currentMaximizedVideo = null;
+    }
+    
+    // Minimize video button event
+    minimizeVideoBtn.addEventListener('click', minimizeVideo);
+    
     // Handle remote video tracks
     window.onRemoteVideoTrack = function(username, stream, isScreenShare = false) {
         // Remove existing video for this user
@@ -2718,7 +2727,7 @@
         
         // Create video element
         const videoContainer = document.createElement('div');
-        videoContainer.className = 'remote-video-container';
+        videoContainer.className = 'video-container';
         videoContainer.id = `video-${username}`;
         
         // Mark as screen share for priority display
@@ -2732,27 +2741,36 @@
         video.playsInline = true;
         
         const label = document.createElement('div');
-        label.className = 'remote-video-label';
+        label.className = 'video-label';
         label.textContent = isScreenShare ? `${username} (Screen)` : username;
+        
+        const maximizeBtn = document.createElement('button');
+        maximizeBtn.className = 'maximize-btn';
+        maximizeBtn.textContent = '⛶';
+        maximizeBtn.title = 'Maximize';
+        maximizeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            maximizeVideo(video, username, isScreenShare);
+        });
         
         videoContainer.appendChild(video);
         videoContainer.appendChild(label);
+        videoContainer.appendChild(maximizeBtn);
+        
+        // Add click to maximize on the whole container
+        videoContainer.addEventListener('click', () => {
+            maximizeVideo(video, username, isScreenShare);
+        });
         
         // Insert screen shares at the beginning for priority
         if (isScreenShare) {
-            remoteVideos.insertBefore(videoContainer, remoteVideos.firstChild);
+            videoGrid.insertBefore(videoContainer, videoGrid.firstChild);
         } else {
-            remoteVideos.appendChild(videoContainer);
+            videoGrid.appendChild(videoContainer);
         }
         
         // Update grid layout based on video count
         updateVideoGridLayout();
-        
-        // Make sure voice participants panel is visible
-        if (!voiceParticipants.classList.contains('active')) {
-            voiceParticipants.classList.add('active');
-            voiceParticipants.classList.remove('hidden');
-        }
     };
     
     // Handle local video track (when user enables their own camera or screen share)
@@ -2766,7 +2784,7 @@
         if (stream) {
             // Create video element for local preview
             const videoContainer = document.createElement('div');
-            videoContainer.className = 'remote-video-container';
+            videoContainer.className = 'video-container';
             videoContainer.id = 'video-local';
             
             // Add screen-share class for screen shares to apply priority display styling
@@ -2781,21 +2799,31 @@
             video.muted = true; // Mute local preview to avoid feedback
             
             const label = document.createElement('div');
-            label.className = 'remote-video-label';
+            label.className = 'video-label';
             label.textContent = isScreenShare ? `${username} (Your Screen)` : `${username} (You)`;
+            
+            const maximizeBtn = document.createElement('button');
+            maximizeBtn.className = 'maximize-btn';
+            maximizeBtn.textContent = '⛶';
+            maximizeBtn.title = 'Maximize';
+            maximizeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                maximizeVideo(video, username, isScreenShare);
+            });
             
             videoContainer.appendChild(video);
             videoContainer.appendChild(label);
-            remoteVideos.appendChild(videoContainer);
+            videoContainer.appendChild(maximizeBtn);
+            
+            // Add click to maximize on the whole container
+            videoContainer.addEventListener('click', () => {
+                maximizeVideo(video, username, isScreenShare);
+            });
+            
+            videoGrid.appendChild(videoContainer);
             
             // Update grid layout
             updateVideoGridLayout();
-            
-            // Make sure voice participants panel is visible
-            if (!voiceParticipants.classList.contains('active')) {
-                voiceParticipants.classList.add('active');
-                voiceParticipants.classList.remove('hidden');
-            }
         } else {
             // Update grid layout after removing video
             updateVideoGridLayout();
@@ -2804,16 +2832,16 @@
     
     // Update video grid layout based on number of videos
     function updateVideoGridLayout() {
-        const videoCount = remoteVideos.querySelectorAll('.remote-video-container:not(.screen-share)').length;
+        const videoCount = videoGrid.querySelectorAll('.video-container:not(.screen-share)').length;
         
         // Remove all grid classes
-        remoteVideos.classList.remove('grid-2', 'grid-3');
+        videoGrid.classList.remove('grid-2', 'grid-3', 'grid-4');
         
         // Add appropriate grid class based on count
         if (videoCount >= 5) {
-            remoteVideos.classList.add('grid-3');
+            videoGrid.classList.add('grid-3');
         } else if (videoCount >= 2) {
-            remoteVideos.classList.add('grid-2');
+            videoGrid.classList.add('grid-2');
         }
         // 1 video or 0 videos uses default single column
     }

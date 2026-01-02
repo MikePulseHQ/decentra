@@ -117,17 +117,25 @@
                 </div>
             </div>
             
-            <!-- Voice participants panel -->
-            <div id="voice-participants" class="voice-participants hidden">
+        </div>
+        
+        <!-- Video Call Area (shown during calls) -->
+        <div id="video-call-area" class="video-call-area hidden">
+            <div class="video-main-display">
+                <div id="video-grid" class="video-grid">
+                    <!-- Video streams will be added here -->
+                </div>
+                <div id="maximized-video-container" class="maximized-video-container hidden">
+                    <!-- Maximized video will be shown here -->
+                    <button id="minimize-video-btn" class="minimize-video-btn">✕</button>
+                </div>
+            </div>
+            <div id="voice-participants" class="voice-participants-sidebar">
                 <div class="participants-header">
-                    <h4>Voice Participants</h4>
-                    <button id="close-participants-btn" class="btn btn-small btn-icon">✕</button>
+                    <h4>Participants</h4>
                 </div>
                 <div id="participants-list" class="participants-list">
                     <!-- Participants will be added here -->
-                </div>
-                <div id="remote-videos" class="remote-videos">
-                    <!-- Remote video streams will be added here -->
                 </div>
             </div>
         </div>
