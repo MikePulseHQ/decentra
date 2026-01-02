@@ -178,6 +178,9 @@
     const toggleMembersBtn = document.getElementById('toggle-members-btn');
     const serverMembersDisplay = document.getElementById('server-members-display');
     
+    // Mention autocomplete elements
+    const mentionAutocomplete = document.getElementById('mention-autocomplete');
+    
     let incomingCallFrom = null;
     let currentlySelectedServer = null;
     let currentAvatar = '👤';
@@ -188,6 +191,12 @@
     let currentEditingRole = null;
     let isCreatingNewRole = false;
     
+    // Mention autocomplete state
+    let mentionActive = false;
+    let mentionStartPos = -1;
+    let mentionQuery = '';
+    let selectedMentionIndex = 0;
+    let currentServerMembers = [];
     // Initialize notification manager
     let notificationManager = null;
     if (window.NotificationManager) {
@@ -504,6 +513,8 @@
                 // Also update the sidebar if we're viewing this server
                 if (currentlySelectedServer === data.server_id) {
                     displayServerMembersInSidebar(data.members);
+                    // Store current server members for mention autocomplete
+                    currentServerMembers = data.members;
                 }
                 break;
                 
@@ -995,6 +1006,142 @@
         });
     }
     
+    // Mention autocomplete functions
+    function getAvailableMentions() {
+        // Return list of users based on current context
+        if (currentContext && currentContext.type === 'server') {
+            // In a server channel - show server members
+            return currentServerMembers.map(m => ({
+                username: m.username,
+                avatar: m.avatar || '👤',
+                avatar_type: m.avatar_type || 'emoji',
+                avatar_data: m.avatar_data
+            }));
+        } else if (currentContext && currentContext.type === 'dm') {
+            // In a DM - show the other person
+            const currentDm = dms.find(dm => dm.id === currentContext.dmId);
+            if (currentDm) {
+                return [{
+                    username: currentDm.username,
+                    avatar: currentDm.avatar || '👤',
+                    avatar_type: currentDm.avatar_type || 'emoji',
+                    avatar_data: currentDm.avatar_data
+                }];
+            }
+        }
+        return [];
+    }
+    
+    function showMentionAutocomplete(query) {
+        const availableUsers = getAvailableMentions();
+        if (availableUsers.length === 0) {
+            hideMentionAutocomplete();
+            return;
+        }
+        
+        // Filter users based on query
+        const queryLower = query.toLowerCase();
+        const filteredUsers = query 
+            ? availableUsers.filter(u => u.username.toLowerCase().startsWith(queryLower))
+            : availableUsers;
+        
+        if (filteredUsers.length === 0) {
+            hideMentionAutocomplete();
+            return;
+        }
+        
+        // Build autocomplete HTML
+        mentionAutocomplete.innerHTML = '';
+        
+        const header = document.createElement('div');
+        header.className = 'mention-autocomplete-header';
+        header.textContent = 'Mention';
+        mentionAutocomplete.appendChild(header);
+        
+        // Reset selected index if it's out of bounds
+        if (selectedMentionIndex >= filteredUsers.length) {
+            selectedMentionIndex = 0;
+        }
+        
+        filteredUsers.forEach((user, index) => {
+            const item = document.createElement('div');
+            item.className = 'mention-item';
+            if (index === selectedMentionIndex) {
+                item.classList.add('selected');
+            }
+            
+            const avatarEl = createAvatarElement(user, 'member-avatar');
+            
+            const usernameSpan = document.createElement('span');
+            usernameSpan.className = 'mention-username';
+            usernameSpan.textContent = user.username;
+            
+            item.appendChild(avatarEl);
+            item.appendChild(usernameSpan);
+            
+            // Click handler
+            item.addEventListener('click', () => {
+                selectMention(user.username);
+            });
+            
+            mentionAutocomplete.appendChild(item);
+        });
+        
+        mentionAutocomplete.classList.remove('hidden');
+    }
+    
+    function hideMentionAutocomplete() {
+        mentionAutocomplete.classList.add('hidden');
+        mentionActive = false;
+        mentionStartPos = -1;
+        mentionQuery = '';
+        selectedMentionIndex = 0;
+    }
+    
+    function selectMention(username) {
+        const currentValue = messageInput.value;
+        const beforeMention = currentValue.substring(0, mentionStartPos);
+        const afterMention = currentValue.substring(messageInput.selectionStart);
+        
+        messageInput.value = beforeMention + '@' + username + ' ' + afterMention;
+        messageInput.focus();
+        
+        // Set cursor position after the inserted mention
+        const newCursorPos = beforeMention.length + username.length + 2; // +2 for @ and space
+        messageInput.setSelectionRange(newCursorPos, newCursorPos);
+        
+        hideMentionAutocomplete();
+    }
+    
+    function navigateMentionAutocomplete(direction) {
+        const items = mentionAutocomplete.querySelectorAll('.mention-item');
+        if (items.length === 0) return;
+        
+        // Remove current selection
+        items[selectedMentionIndex]?.classList.remove('selected');
+        
+        // Update index
+        if (direction === 'up') {
+            selectedMentionIndex = selectedMentionIndex > 0 ? selectedMentionIndex - 1 : items.length - 1;
+        } else {
+            selectedMentionIndex = selectedMentionIndex < items.length - 1 ? selectedMentionIndex + 1 : 0;
+        }
+        
+        // Add new selection
+        items[selectedMentionIndex]?.classList.add('selected');
+        
+        // Scroll into view
+        items[selectedMentionIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+    
+    function selectCurrentMention() {
+        const items = mentionAutocomplete.querySelectorAll('.mention-item');
+        if (items.length > 0 && items[selectedMentionIndex]) {
+            const username = items[selectedMentionIndex].querySelector('.mention-username').textContent;
+            selectMention(username);
+        }
+    }
+    
     // Update channels list for a server
     function updateChannelsForServer(serverId) {
         const server = servers.find(s => s.id === serverId);
@@ -1164,6 +1311,11 @@
     messageForm.addEventListener('submit', (e) => {
         e.preventDefault();
         
+        // Hide autocomplete if open
+        if (mentionActive) {
+            hideMentionAutocomplete();
+        }
+        
         const message = messageInput.value.trim();
         if (!message || !authenticated) {
             console.log('Cannot send message - empty or not authenticated');
@@ -1188,6 +1340,67 @@
         console.log('Sending message:', msgData);
         ws.send(JSON.stringify(msgData));
         messageInput.value = '';
+    });
+    
+    // Message input - handle mention autocomplete
+    messageInput.addEventListener('input', (e) => {
+        const value = messageInput.value;
+        const cursorPos = messageInput.selectionStart;
+        
+        // Find @ symbol before cursor
+        let atPos = -1;
+        for (let i = cursorPos - 1; i >= 0; i--) {
+            if (value[i] === '@') {
+                // Check if @ is at start or preceded by whitespace
+                if (i === 0 || /\s/.test(value[i - 1])) {
+                    atPos = i;
+                    break;
+                }
+            } else if (/\s/.test(value[i])) {
+                // Hit whitespace before finding valid @
+                break;
+            }
+        }
+        
+        if (atPos !== -1) {
+            // Extract query after @
+            const query = value.substring(atPos + 1, cursorPos);
+            
+            // Only show autocomplete if query doesn't contain whitespace
+            if (!/\s/.test(query)) {
+                mentionActive = true;
+                mentionStartPos = atPos;
+                mentionQuery = query;
+                selectedMentionIndex = 0;
+                showMentionAutocomplete(query);
+            } else {
+                hideMentionAutocomplete();
+            }
+        } else {
+            hideMentionAutocomplete();
+        }
+    });
+    
+    // Message input - handle keyboard navigation for mentions
+    messageInput.addEventListener('keydown', (e) => {
+        if (!mentionActive) return;
+        
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            navigateMentionAutocomplete('down');
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            navigateMentionAutocomplete('up');
+        } else if (e.key === 'Enter' && !e.shiftKey) {
+            // Check if autocomplete is visible and has items
+            if (!mentionAutocomplete.classList.contains('hidden')) {
+                e.preventDefault();
+                selectCurrentMention();
+            }
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            hideMentionAutocomplete();
+        }
     });
     
     // User menu toggle
