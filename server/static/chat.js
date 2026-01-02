@@ -1824,7 +1824,6 @@
                 icon_data: base64Data
             }));
             
-            showNotification('Server icon uploaded!');
             uploadServerIconBtn.classList.add('hidden');
             selectedServerIconFile = null;
             serverIconPreview.textContent = '📁 Choose an image';
