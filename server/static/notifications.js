@@ -327,7 +327,7 @@ class NotificationManager {
         if (this.currentUsername) {
             // Escape special regex characters in username
             const escapedUsername = this.currentUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const mentionRegex = new RegExp(`@${escapedUsername}\\b`, 'i');
+            const mentionRegex = new RegExp(`\\b@${escapedUsername}\\b`, 'i');
             isMention = mentionRegex.test(message);
         }
         
