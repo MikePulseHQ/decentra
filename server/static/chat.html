@@ -92,7 +92,12 @@
             
             <div class="input-container">
                 <form id="message-form">
-                    <input type="text" id="message-input" placeholder="Select a channel or DM to start chatting..." autocomplete="off" disabled>
+                    <div class="message-input-wrapper">
+                        <input type="text" id="message-input" placeholder="Select a channel or DM to start chatting..." autocomplete="off" disabled>
+                        <div id="mention-autocomplete" class="mention-autocomplete hidden">
+                            <!-- Mention suggestions will be populated here -->
+                        </div>
+                    </div>
                     <button type="submit" class="btn btn-primary" disabled>Send</button>
                 </form>
             </div>
