@@ -680,8 +680,9 @@
                             // When screen sharing stops, remove any existing screen share video element
                             if (!data.screen_sharing) {
                                 const screenShareVideo = document.getElementById(`video-${data.username}`);
-                                if (screenShareVideo) {
+                                if (screenShareVideo && screenShareVideo.classList.contains('screen-share')) {
                                     screenShareVideo.remove();
+                                    updateVideoGridLayout();
                                 }
                             }
                             updateVoiceParticipants(voiceMembers[currentKey]);
@@ -2730,8 +2731,8 @@
         }
     };
     
-    // Handle local video track (when user enables their own camera)
-    window.onLocalVideoTrack = function(stream) {
+    // Handle local video track (when user enables their own camera or screen share)
+    window.onLocalVideoTrack = function(stream, isScreenShare = false) {
         // Remove existing local video preview if it exists
         const existingVideo = document.getElementById('video-local');
         if (existingVideo) {
@@ -2744,6 +2745,11 @@
             videoContainer.className = 'remote-video-container';
             videoContainer.id = 'video-local';
             
+            // Add screen-share class for screen shares to apply priority display styling
+            if (isScreenShare) {
+                videoContainer.classList.add('screen-share');
+            }
+            
             const video = document.createElement('video');
             video.srcObject = stream;
             video.autoplay = true;
@@ -2752,7 +2758,7 @@
             
             const label = document.createElement('div');
             label.className = 'remote-video-label';
-            label.textContent = `${username} (You)`;
+            label.textContent = isScreenShare ? `${username} (Your Screen)` : `${username} (You)`;
             
             videoContainer.appendChild(video);
             videoContainer.appendChild(label);

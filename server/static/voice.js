@@ -264,7 +264,7 @@ class VoiceChat {
                 
                 // Update local video display if it exists
                 if (window.onLocalVideoTrack) {
-                    window.onLocalVideoTrack(this.localVideoStream);
+                    window.onLocalVideoTrack(this.localVideoStream, false);
                 }
                 
                 // Only stop old stream after successfully creating and applying new stream
@@ -301,7 +301,7 @@ class VoiceChat {
                 
                 // Show local video preview
                 if (window.onLocalVideoTrack) {
-                    window.onLocalVideoTrack(this.localVideoStream);
+                    window.onLocalVideoTrack(this.localVideoStream, false);
                 }
                 
                 // Notify server
@@ -338,7 +338,7 @@ class VoiceChat {
             
             // Remove local video preview
             if (window.onLocalVideoTrack) {
-                window.onLocalVideoTrack(null);
+                window.onLocalVideoTrack(null, false);
             }
             
             // Notify server
@@ -415,7 +415,7 @@ class VoiceChat {
                 
                 // Show local screen share preview
                 if (window.onLocalVideoTrack) {
-                    window.onLocalVideoTrack(this.localScreenStream);
+                    window.onLocalVideoTrack(this.localScreenStream, true);
                 }
                 
                 // Notify server
@@ -462,9 +462,9 @@ class VoiceChat {
             // Restore camera preview if video is enabled, otherwise remove preview
             if (window.onLocalVideoTrack) {
                 if (this.isVideoEnabled && this.localVideoStream) {
-                    window.onLocalVideoTrack(this.localVideoStream);
+                    window.onLocalVideoTrack(this.localVideoStream, false);
                 } else {
-                    window.onLocalVideoTrack(null);
+                    window.onLocalVideoTrack(null, false);
                 }
             }
             
@@ -508,9 +508,9 @@ class VoiceChat {
         // Restore camera preview if video is enabled, otherwise remove preview
         if (window.onLocalVideoTrack) {
             if (this.isVideoEnabled && this.localVideoStream) {
-                window.onLocalVideoTrack(this.localVideoStream);
+                window.onLocalVideoTrack(this.localVideoStream, false);
             } else {
-                window.onLocalVideoTrack(null);
+                window.onLocalVideoTrack(null, false);
             }
         }
         
