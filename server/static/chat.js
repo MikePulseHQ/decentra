@@ -147,6 +147,13 @@
     const remoteVideos = document.getElementById('remote-videos');
     const closeParticipantsBtn = document.getElementById('close-participants-btn');
     
+    // Screen share settings modal
+    const screenShareSettingsModal = document.getElementById('screen-share-settings-modal');
+    const screenResolutionSelect = document.getElementById('screen-resolution-select');
+    const screenFramerateSelect = document.getElementById('screen-framerate-select');
+    const startScreenShareBtn = document.getElementById('start-screen-share-btn');
+    const cancelScreenShareBtn = document.getElementById('cancel-screen-share-btn');
+    
     // Avatar and device modals
     const avatarSettingsModal = document.getElementById('avatar-settings-modal');
     const avatarPicker = document.getElementById('avatar-picker');
@@ -177,6 +184,9 @@
     const rightSidebar = document.getElementById('right-sidebar');
     const toggleMembersBtn = document.getElementById('toggle-members-btn');
     const serverMembersDisplay = document.getElementById('server-members-display');
+    
+    // Main container for layout changes
+    const mainContainer = document.querySelector('.main-container');
     
     // Mention autocomplete elements
     const mentionAutocomplete = document.getElementById('mention-autocomplete');
@@ -577,6 +587,21 @@
                 
             case 'voice_state_update':
                 if (voiceChat) {
+                    // Initialize screen sharing state for all voice members BEFORE handling voice state,
+                    // so that any peer connections or incoming tracks can use the correct state.
+                    if (voiceChat.remoteScreenSharing && typeof voiceChat.remoteScreenSharing.clear === 'function') {
+                        voiceChat.remoteScreenSharing.clear();
+                    }
+                    if (data.voice_members) {
+                        data.voice_members.forEach(member => {
+                            const memberUsername = typeof member === 'object' ? member.username : member;
+                            const isScreenSharing = typeof member === 'object' ? member.screen_sharing : false;
+                            if (voiceChat.remoteScreenSharing && typeof voiceChat.remoteScreenSharing.set === 'function') {
+                                voiceChat.remoteScreenSharing.set(memberUsername, isScreenSharing);
+                            }
+                        });
+                    }
+
                     voiceChat.handleVoiceStateUpdate(data);
                 }
                 // Update voice members display
@@ -648,6 +673,18 @@
                         );
                         if (participant && typeof participant === 'object') {
                             participant.screen_sharing = data.screen_sharing;
+                            // Track in voiceChat for video display
+                            if (voiceChat) {
+                                voiceChat.remoteScreenSharing.set(data.username, data.screen_sharing);
+                            }
+                            // When screen sharing stops, remove any existing screen share video element
+                            if (!data.screen_sharing) {
+                                const screenShareVideo = document.getElementById(`video-${data.username}`);
+                                if (screenShareVideo && screenShareVideo.classList.contains('screen-share')) {
+                                    screenShareVideo.remove();
+                                    updateVideoGridLayout();
+                                }
+                            }
                             updateVoiceParticipants(voiceMembers[currentKey]);
                         }
                     }
@@ -2089,10 +2126,40 @@
     function showVoiceControls(statusText) {
         voiceStatusText.textContent = statusText;
         voiceControls.classList.remove('hidden');
+        
+        // Apply layout changes for call UI
+        mainContainer.classList.add('in-voice-call');
+        voiceParticipants.classList.add('active');
+        voiceParticipants.classList.remove('hidden');
+        
+        // Collapse members sidebar if visible
+        if (!rightSidebar.classList.contains('hidden')) {
+            rightSidebar.classList.add('collapsed');
+            toggleMembersBtn.textContent = '▶';
+            toggleMembersBtn.title = 'Expand';
+        }
     }
     
     function hideVoiceControls() {
         voiceControls.classList.add('hidden');
+        
+        // Remove layout changes
+        mainContainer.classList.remove('in-voice-call');
+        voiceParticipants.classList.remove('active');
+        voiceParticipants.classList.add('hidden');
+        
+        // Restore members sidebar if it was visible before the call
+        // Only restore if we're currently viewing a server
+        if (currentlySelectedServer) {
+            if (!rightSidebar.classList.contains('hidden')) {
+                rightSidebar.classList.remove('collapsed');
+                toggleMembersBtn.textContent = '◀';
+                toggleMembersBtn.title = 'Collapse';
+            }
+        }
+        
+        // Clear video elements
+        remoteVideos.innerHTML = '';
     }
     
     // Voice control event listeners
@@ -2114,9 +2181,15 @@
     
     screenShareBtn.addEventListener('click', async () => {
         if (voiceChat) {
-            const sharing = await voiceChat.toggleScreenShare();
-            screenShareBtn.textContent = sharing ? '🖥️✓' : '🖥️';
-            screenShareBtn.title = sharing ? 'Stop Sharing' : 'Share Screen';
+            if (voiceChat.isScreenSharing) {
+                // Stop sharing
+                const sharing = await voiceChat.toggleScreenShare();
+                screenShareBtn.textContent = sharing ? '🖥️✓' : '🖥️';
+                screenShareBtn.title = sharing ? 'Stop Sharing' : 'Share Screen';
+            } else {
+                // Show settings modal before starting
+                screenShareSettingsModal.classList.remove('hidden');
+            }
         }
     });
     
@@ -2447,9 +2520,43 @@
         }
     });
     
+    // Screen share settings modal handlers
+    startScreenShareBtn.addEventListener('click', async () => {
+        if (voiceChat) {
+            const resolution = screenResolutionSelect.value;
+            const framerate = screenFramerateSelect.value;
+            
+            // Start screen sharing with selected settings
+            const sharing = await voiceChat.toggleScreenShare(resolution, framerate);
+            screenShareBtn.textContent = sharing ? '🖥️✓' : '🖥️';
+            screenShareBtn.title = sharing ? 'Stop Sharing' : 'Share Screen';
+            
+            // Close modal
+            screenShareSettingsModal.classList.add('hidden');
+        }
+    });
+    
+    cancelScreenShareBtn.addEventListener('click', () => {
+        screenShareSettingsModal.classList.add('hidden');
+    });
+    
+    screenShareSettingsModal.addEventListener('click', (e) => {
+        if (e.target === screenShareSettingsModal) {
+            screenShareSettingsModal.classList.add('hidden');
+        }
+    });
+    
     // Close voice participants panel
     closeParticipantsBtn.addEventListener('click', () => {
+        // Hide the participants panel
         voiceParticipants.classList.add('hidden');
+        voiceParticipants.classList.remove('active');
+
+        // Restore layout by removing the in-voice-call state from the main container
+        const inVoiceCallContainer = document.querySelector('.in-voice-call');
+        if (inVoiceCallContainer) {
+            inVoiceCallContainer.classList.remove('in-voice-call');
+        }
     });
     
     // Populate device selects
@@ -2578,7 +2685,7 @@
         }
     });
     // Handle remote video tracks
-    window.onRemoteVideoTrack = function(username, stream) {
+    window.onRemoteVideoTrack = function(username, stream, isScreenShare = false) {
         // Remove existing video for this user
         const existingVideo = document.getElementById(`video-${username}`);
         if (existingVideo) {
@@ -2590,6 +2697,11 @@
         videoContainer.className = 'remote-video-container';
         videoContainer.id = `video-${username}`;
         
+        // Mark as screen share for priority display
+        if (isScreenShare) {
+            videoContainer.classList.add('screen-share');
+        }
+        
         const video = document.createElement('video');
         video.srcObject = stream;
         video.autoplay = true;
@@ -2597,12 +2709,90 @@
         
         const label = document.createElement('div');
         label.className = 'remote-video-label';
-        label.textContent = username;
+        label.textContent = isScreenShare ? `${username} (Screen)` : username;
         
         videoContainer.appendChild(video);
         videoContainer.appendChild(label);
-        remoteVideos.appendChild(videoContainer);
+        
+        // Insert screen shares at the beginning for priority
+        if (isScreenShare) {
+            remoteVideos.insertBefore(videoContainer, remoteVideos.firstChild);
+        } else {
+            remoteVideos.appendChild(videoContainer);
+        }
+        
+        // Update grid layout based on video count
+        updateVideoGridLayout();
+        
+        // Make sure voice participants panel is visible
+        if (!voiceParticipants.classList.contains('active')) {
+            voiceParticipants.classList.add('active');
+            voiceParticipants.classList.remove('hidden');
+        }
     };
+    
+    // Handle local video track (when user enables their own camera or screen share)
+    window.onLocalVideoTrack = function(stream, isScreenShare = false) {
+        // Remove existing local video preview if it exists
+        const existingVideo = document.getElementById('video-local');
+        if (existingVideo) {
+            existingVideo.remove();
+        }
+        
+        if (stream) {
+            // Create video element for local preview
+            const videoContainer = document.createElement('div');
+            videoContainer.className = 'remote-video-container';
+            videoContainer.id = 'video-local';
+            
+            // Add screen-share class for screen shares to apply priority display styling
+            if (isScreenShare) {
+                videoContainer.classList.add('screen-share');
+            }
+            
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = true; // Mute local preview to avoid feedback
+            
+            const label = document.createElement('div');
+            label.className = 'remote-video-label';
+            label.textContent = isScreenShare ? `${username} (Your Screen)` : `${username} (You)`;
+            
+            videoContainer.appendChild(video);
+            videoContainer.appendChild(label);
+            remoteVideos.appendChild(videoContainer);
+            
+            // Update grid layout
+            updateVideoGridLayout();
+            
+            // Make sure voice participants panel is visible
+            if (!voiceParticipants.classList.contains('active')) {
+                voiceParticipants.classList.add('active');
+                voiceParticipants.classList.remove('hidden');
+            }
+        } else {
+            // Update grid layout after removing video
+            updateVideoGridLayout();
+        }
+    };
+    
+    // Update video grid layout based on number of videos
+    function updateVideoGridLayout() {
+        const videoCount = remoteVideos.querySelectorAll('.remote-video-container:not(.screen-share)').length;
+        
+        // Remove all grid classes
+        remoteVideos.classList.remove('grid-2', 'grid-3');
+        
+        // Add appropriate grid class based on count
+        if (videoCount >= 5) {
+            remoteVideos.classList.add('grid-3');
+        } else if (videoCount >= 2) {
+            remoteVideos.classList.add('grid-2');
+        }
+        // 1 video or 0 videos uses default single column
+    }
     
     // Scroll to bottom of messages
     function scrollToBottom() {

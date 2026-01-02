@@ -18,10 +18,15 @@ class VoiceChat {
         this.selectedSpeakerId = null;
         this.selectedCameraId = null;
         this.setSinkIdWarningShown = false; // Track if setSinkId warning has been shown
+        this.remoteScreenSharing = new Map(); // Track which peers are screen sharing
         
         // Video configuration constants
         this.VIDEO_WIDTH = 640;
         this.VIDEO_HEIGHT = 480;
+        
+        // Screen share settings (default values)
+        this.screenShareResolution = 720; // 720p default
+        this.screenShareFramerate = 30; // 30 FPS default
         
         // ICE servers configuration (using public STUN servers)
         this.iceServers = {
@@ -259,7 +264,7 @@ class VoiceChat {
                 
                 // Update local video display if it exists
                 if (window.onLocalVideoTrack) {
-                    window.onLocalVideoTrack(this.localVideoStream);
+                    window.onLocalVideoTrack(this.localVideoStream, false);
                 }
                 
                 // Only stop old stream after successfully creating and applying new stream
@@ -294,6 +299,11 @@ class VoiceChat {
                     });
                 });
                 
+                // Show local video preview
+                if (window.onLocalVideoTrack) {
+                    window.onLocalVideoTrack(this.localVideoStream, false);
+                }
+                
                 // Notify server
                 this.ws.send(JSON.stringify({
                     type: 'voice_video',
@@ -326,6 +336,11 @@ class VoiceChat {
             
             this.isVideoEnabled = false;
             
+            // Remove local video preview
+            if (window.onLocalVideoTrack) {
+                window.onLocalVideoTrack(null, false);
+            }
+            
             // Notify server
             this.ws.send(JSON.stringify({
                 type: 'voice_video',
@@ -336,12 +351,39 @@ class VoiceChat {
         }
     }
     
-    async toggleScreenShare() {
+    async toggleScreenShare(resolution, framerate) {
         if (!this.isScreenSharing) {
             // Start screen sharing
             try {
+                // Normalize inputs to integers
+                const res = parseInt(resolution || this.screenShareResolution);
+                const fps = parseInt(framerate || this.screenShareFramerate);
+                
+                // Calculate dimensions based on resolution setting
+                let width, height;
+                switch (res) {
+                    case 1080:
+                        width = 1920;
+                        height = 1080;
+                        break;
+                    case 480:
+                        width = 854;
+                        height = 480;
+                        break;
+                    case 720:
+                    default:
+                        width = 1280;
+                        height = 720;
+                        break;
+                }
+                
                 this.localScreenStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { cursor: 'always' },
+                    video: { 
+                        cursor: 'always',
+                        width: { ideal: width, max: width },
+                        height: { ideal: height, max: height },
+                        frameRate: { ideal: fps, max: fps }
+                    },
                     audio: false
                 });
                 
@@ -370,6 +412,11 @@ class VoiceChat {
                         pc.addTrack(screenTrack, this.localScreenStream);
                     }
                 });
+                
+                // Show local screen share preview
+                if (window.onLocalVideoTrack) {
+                    window.onLocalVideoTrack(this.localScreenStream, true);
+                }
                 
                 // Notify server
                 this.ws.send(JSON.stringify({
@@ -412,6 +459,15 @@ class VoiceChat {
             
             this.isScreenSharing = false;
             
+            // Restore camera preview if video is enabled, otherwise remove preview
+            if (window.onLocalVideoTrack) {
+                if (this.isVideoEnabled && this.localVideoStream) {
+                    window.onLocalVideoTrack(this.localVideoStream, false);
+                } else {
+                    window.onLocalVideoTrack(null, false);
+                }
+            }
+            
             // Notify server
             this.ws.send(JSON.stringify({
                 type: 'voice_screen_share',
@@ -448,6 +504,15 @@ class VoiceChat {
         }
         
         this.isScreenSharing = false;
+        
+        // Restore camera preview if video is enabled, otherwise remove preview
+        if (window.onLocalVideoTrack) {
+            if (this.isVideoEnabled && this.localVideoStream) {
+                window.onLocalVideoTrack(this.localVideoStream, false);
+            } else {
+                window.onLocalVideoTrack(null, false);
+            }
+        }
         
         // Notify server
         this.ws.send(JSON.stringify({
@@ -681,8 +746,10 @@ class VoiceChat {
                 pc.remoteAudio = remoteAudio;
             } else if (event.track.kind === 'video') {
                 // Handle video track - emit event for UI to handle
+                // Check if this user is screen sharing
+                const isScreenShare = this.remoteScreenSharing.get(targetUsername) || false;
                 if (window.onRemoteVideoTrack) {
-                    window.onRemoteVideoTrack(targetUsername, event.streams[0]);
+                    window.onRemoteVideoTrack(targetUsername, event.streams[0], isScreenShare);
                 }
             }
         };
