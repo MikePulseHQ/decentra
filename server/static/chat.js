@@ -2512,10 +2512,6 @@
             const resolution = screenResolutionSelect.value;
             const framerate = screenFramerateSelect.value;
             
-            // Store settings in voiceChat
-            voiceChat.screenShareResolution = parseInt(resolution);
-            voiceChat.screenShareFramerate = parseInt(framerate);
-            
             // Start screen sharing with selected settings
             const sharing = await voiceChat.toggleScreenShare(resolution, framerate);
             screenShareBtn.textContent = sharing ? '🖥️✓' : '🖥️';
