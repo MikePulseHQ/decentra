@@ -658,6 +658,10 @@
                         );
                         if (participant && typeof participant === 'object') {
                             participant.screen_sharing = data.screen_sharing;
+                            // Track in voiceChat for video display
+                            if (voiceChat) {
+                                voiceChat.remoteScreenSharing.set(data.username, data.screen_sharing);
+                            }
                             updateVoiceParticipants(voiceMembers[currentKey]);
                         }
                     }
@@ -2692,6 +2696,42 @@
         if (!voiceParticipants.classList.contains('active')) {
             voiceParticipants.classList.add('active');
             voiceParticipants.classList.remove('hidden');
+        }
+    };
+    
+    // Handle local video track (when user enables their own camera)
+    window.onLocalVideoTrack = function(stream) {
+        // Remove existing local video preview if it exists
+        const existingVideo = document.getElementById('video-local');
+        if (existingVideo) {
+            existingVideo.remove();
+        }
+        
+        if (stream) {
+            // Create video element for local preview
+            const videoContainer = document.createElement('div');
+            videoContainer.className = 'remote-video-container';
+            videoContainer.id = 'video-local';
+            
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.autoplay = true;
+            video.playsInline = true;
+            video.muted = true; // Mute local preview to avoid feedback
+            
+            const label = document.createElement('div');
+            label.className = 'remote-video-label';
+            label.textContent = `${username} (You)`;
+            
+            videoContainer.appendChild(video);
+            videoContainer.appendChild(label);
+            remoteVideos.appendChild(videoContainer);
+            
+            // Make sure voice participants panel is visible
+            if (!voiceParticipants.classList.contains('active')) {
+                voiceParticipants.classList.add('active');
+                voiceParticipants.classList.remove('hidden');
+            }
         }
     };
     

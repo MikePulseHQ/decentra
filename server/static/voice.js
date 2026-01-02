@@ -331,6 +331,11 @@ class VoiceChat {
             
             this.isVideoEnabled = false;
             
+            // Remove local video preview
+            if (window.onLocalVideoTrack) {
+                window.onLocalVideoTrack(null);
+            }
+            
             // Notify server
             this.ws.send(JSON.stringify({
                 type: 'voice_video',
@@ -714,8 +719,10 @@ class VoiceChat {
                 pc.remoteAudio = remoteAudio;
             } else if (event.track.kind === 'video') {
                 // Handle video track - emit event for UI to handle
+                // Check if this user is screen sharing
+                const isScreenShare = this.remoteScreenSharing.get(targetUsername) || false;
                 if (window.onRemoteVideoTrack) {
-                    window.onRemoteVideoTrack(targetUsername, event.streams[0]);
+                    window.onRemoteVideoTrack(targetUsername, event.streams[0], isScreenShare);
                 }
             }
         };
