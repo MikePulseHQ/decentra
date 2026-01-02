@@ -56,7 +56,8 @@ class Database:
                             created_at TIMESTAMP NOT NULL,
                             avatar VARCHAR(255) DEFAULT '👤',
                             avatar_type VARCHAR(50) DEFAULT 'emoji',
-                            avatar_data TEXT
+                            avatar_data TEXT,
+                            notification_mode VARCHAR(50) DEFAULT 'all'
                         )
                     ''')
                     
@@ -271,6 +272,16 @@ class Database:
                 SET avatar = %s, avatar_type = %s, avatar_data = %s
                 WHERE username = %s
             ''', (avatar, avatar_type, avatar_data, username))
+    
+    def update_notification_mode(self, username: str, notification_mode: str):
+        """Update user notification mode."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE users 
+                SET notification_mode = %s
+                WHERE username = %s
+            ''', (notification_mode, username))
     
     def get_first_user(self) -> Optional[str]:
         """Get the first user (admin) username."""

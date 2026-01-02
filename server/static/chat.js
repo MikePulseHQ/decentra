@@ -175,6 +175,7 @@
     const closeNotificationSettingsModalBtn = document.getElementById('close-notification-settings-modal');
     const enableNotificationsCheckbox = document.getElementById('enable-notifications');
     const enableNotificationSoundsCheckbox = document.getElementById('enable-notification-sounds');
+    const notificationModeSelect = document.getElementById('notification-mode-select');
     const messageSoundSelect = document.getElementById('message-sound-select');
     const callSoundSelect = document.getElementById('call-sound-select');
     const testMessageSoundBtn = document.getElementById('test-message-sound-btn');
@@ -328,6 +329,14 @@
                 updateServersList();
                 updateDMsList();
                 updateFriendsList();
+                
+                // Initialize notification manager with username and notification mode
+                if (notificationManager) {
+                    notificationManager.setCurrentUsername(username);
+                    if (data.notification_mode) {
+                        notificationManager.setNotificationMode(data.notification_mode);
+                    }
+                }
                 break;
                 
             case 'history':
@@ -2462,6 +2471,7 @@
         if (notificationManager) {
             enableNotificationsCheckbox.checked = notificationManager.notificationsEnabled;
             enableNotificationSoundsCheckbox.checked = notificationManager.soundsEnabled;
+            notificationModeSelect.value = notificationManager.notificationMode;
             messageSoundSelect.value = notificationManager.messageSound;
             callSoundSelect.value = notificationManager.callSound;
         }
@@ -2486,6 +2496,20 @@
     enableNotificationSoundsCheckbox.addEventListener('change', (e) => {
         if (notificationManager) {
             notificationManager.setSoundsEnabled(e.target.checked);
+        }
+    });
+    
+    notificationModeSelect.addEventListener('change', (e) => {
+        if (notificationManager) {
+            notificationManager.setNotificationMode(e.target.value);
+            
+            // Send to server to persist the setting
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'set_notification_mode',
+                    notification_mode: e.target.value
+                }));
+            }
         }
     });
     

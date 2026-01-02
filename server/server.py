@@ -459,10 +459,13 @@ async def handler(websocket):
             })
         
         current_avatar = get_avatar_data(username)
+        user = db.get_user(username)
+        notification_mode = user.get('notification_mode', 'all') if user else 'all'
         user_data = json.dumps({
             'type': 'init',
             'username': username,
             **current_avatar,
+            'notification_mode': notification_mode,
             'servers': user_servers,
             'dms': user_dms,
             'friends': friends_list,
@@ -1508,6 +1511,27 @@ async def handler(websocket):
                             await websocket.send_str(json.dumps({
                                 'type': 'avatar_updated',
                                 **avatar_update
+                            }))
+                    
+                    elif data.get('type') == 'set_notification_mode':
+                        # Update user notification mode
+                        notification_mode = data.get('notification_mode', 'all')
+                        
+                        # Validate notification mode
+                        if notification_mode not in ['all', 'mentions', 'none']:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'Invalid notification mode'
+                            }))
+                            continue
+                        
+                        user = db.get_user(username)
+                        if user:
+                            db.update_notification_mode(username, notification_mode)
+                            
+                            await websocket.send_str(json.dumps({
+                                'type': 'notification_mode_updated',
+                                'notification_mode': notification_mode
                             }))
                     
                     elif data.get('type') == 'voice_video':

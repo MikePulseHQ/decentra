@@ -10,10 +10,16 @@ class NotificationManager {
         const soundsEnabled = localStorage.getItem('notificationSoundsEnabled');
         this.soundsEnabled = soundsEnabled === null ? true : soundsEnabled === 'true';
         
+        // Notification mode: 'all', 'mentions', or 'none'
+        this.notificationMode = localStorage.getItem('notificationMode') || 'all';
+        
         this.messageSound = localStorage.getItem('messageSound') || 'soft-ping';
         this.callSound = localStorage.getItem('callSound') || 'classic-ring';
         this.audioContext = null;
         this.callSoundInterval = null;
+        
+        // Store current username for mention detection
+        this.currentUsername = null;
     }
 
     async init() {
@@ -31,6 +37,10 @@ class NotificationManager {
         if (this.soundsEnabled) {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
+    }
+    
+    setCurrentUsername(username) {
+        this.currentUsername = username;
     }
 
     setNotificationsEnabled(enabled) {
@@ -56,6 +66,15 @@ class NotificationManager {
         if (enabled && !this.audioContext) {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
+    }
+    
+    setNotificationMode(mode) {
+        if (!['all', 'mentions', 'none'].includes(mode)) {
+            console.error('Invalid notification mode:', mode);
+            return;
+        }
+        this.notificationMode = mode;
+        localStorage.setItem('notificationMode', mode);
     }
 
     setMessageSound(sound) {
@@ -298,6 +317,19 @@ class NotificationManager {
     }
 
     notifyNewMessage(sender, message) {
+        // Check notification mode
+        if (this.notificationMode === 'none') {
+            return; // No notifications
+        }
+        
+        // Check if this is a mention
+        const isMention = this.currentUsername && message.includes(`@${this.currentUsername}`);
+        
+        // If mode is 'mentions' and this is not a mention, skip notification
+        if (this.notificationMode === 'mentions' && !isMention) {
+            return;
+        }
+        
         // Only show notification if page is not visible
         // Use Page Visibility API with feature detection
         const isVisible = typeof document.visibilityState !== 'undefined' 
