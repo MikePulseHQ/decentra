@@ -403,6 +403,9 @@ async def handler(websocket):
                     'id': server_id,
                     'name': server_data['name'],
                     'owner': server_data['owner'],
+                    'icon': server_data.get('icon', '🏠'),
+                    'icon_type': server_data.get('icon_type', 'emoji'),
+                    'icon_data': server_data.get('icon_data'),
                     'channels': [
                         {'id': ch['channel_id'], 'name': ch['name'], 'type': ch.get('type', 'text')}
                         for ch in channels
@@ -602,6 +605,9 @@ async def handler(websocket):
                                     'id': server_id,
                                     'name': server_name,
                                     'owner': username,
+                                    'icon': '🏠',
+                                    'icon_type': 'emoji',
+                                    'icon_data': None,
                                     'channels': [{'id': channel_id, 'name': 'general', 'type': 'text'}]
                                 }
                             }))
@@ -998,6 +1004,9 @@ async def handler(websocket):
                                         'id': server_id,
                                         'name': server['name'],
                                         'owner': server['owner'],
+                                        'icon': server.get('icon', '🏠'),
+                                        'icon_type': server.get('icon_type', 'emoji'),
+                                        'icon_data': server.get('icon_data'),
                                         'channels': [
                                             {'id': ch['channel_id'], 'name': ch['name'], 'type': ch.get('type', 'text')}
                                             for ch in channels
@@ -1520,6 +1529,92 @@ async def handler(websocket):
                                 'type': 'avatar_updated',
                                 **avatar_update
                             }))
+                    
+                    elif data.get('type') == 'set_server_icon':
+                        # Update server icon (emoji or image upload)
+                        server_id = data.get('server_id', '')
+                        icon_type = data.get('icon_type', 'emoji')
+                        
+                        # Validate icon_type
+                        if icon_type not in ['emoji', 'image']:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'Invalid icon type. Must be "emoji" or "image".'
+                            }))
+                            continue
+                        
+                        # Verify user has permission to change server icon
+                        server = db.get_server(server_id)
+                        if not server:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'Server not found'
+                            }))
+                            continue
+                        
+                        if not has_permission(server_id, username, 'access_settings'):
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'You do not have permission to change the server icon'
+                            }))
+                            continue
+                        
+                        # Get admin settings for file size limits
+                        admin_settings = db.get_admin_settings()
+                        max_file_size_mb = admin_settings.get('max_file_size_mb', 10)
+                        max_file_size = max_file_size_mb * 1024 * 1024
+                        
+                        if icon_type == 'emoji':
+                            icon = data.get('icon', '🏠').strip()
+                            if not db.update_server_icon(server_id, icon, 'emoji', None):
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': 'Failed to update server icon'
+                                }))
+                                continue
+                        elif icon_type == 'image':
+                            # Handle image upload via base64
+                            icon_data = data.get('icon_data', '')
+                            
+                            # Validate icon_data is not empty
+                            if not icon_data:
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': 'Icon image data is required'
+                                }))
+                                continue
+                            
+                            # Validate size (base64 is ~33% larger than original)
+                            if len(icon_data) > max_file_size * 1.5:
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': f'Icon image too large. Maximum size is {max_file_size_mb}MB.'
+                                }))
+                                continue
+                            
+                            if not db.update_server_icon(server_id, None, 'image', icon_data):
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': 'Failed to update server icon'
+                                }))
+                                continue
+                        
+                        # Get updated server data
+                        updated_server = db.get_server(server_id)
+                        icon_update = {
+                            'icon': updated_server.get('icon', '🏠'),
+                            'icon_type': updated_server.get('icon_type', 'emoji'),
+                            'icon_data': updated_server.get('icon_data')
+                        }
+                        
+                        # Notify all server members about icon change
+                        await broadcast_to_server(server_id, json.dumps({
+                            'type': 'server_icon_update',
+                            'server_id': server_id,
+                            **icon_update
+                        }))
+                        
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} updated icon for server {server_id}")
                     
                     elif data.get('type') == 'set_notification_mode':
                         # Update user notification mode

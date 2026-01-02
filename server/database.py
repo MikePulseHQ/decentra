@@ -67,6 +67,9 @@ class Database:
                             server_id VARCHAR(255) PRIMARY KEY,
                             name VARCHAR(255) NOT NULL,
                             owner VARCHAR(255) NOT NULL,
+                            icon VARCHAR(255) DEFAULT '🏠',
+                            icon_type VARCHAR(50) DEFAULT 'emoji',
+                            icon_data TEXT,
                             FOREIGN KEY (owner) REFERENCES users(username)
                         )
                     ''')
@@ -222,6 +225,31 @@ class Database:
                                 WHERE table_name = 'users' AND column_name = 'notification_mode'
                             ) THEN
                                 ALTER TABLE users ADD COLUMN notification_mode VARCHAR(50) DEFAULT 'all';
+                            END IF;
+                        END $$;
+                    ''')
+                    
+                    # Add server icon columns if they don't exist (migration)
+                    cursor.execute('''
+                        DO $$ 
+                        BEGIN
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name = 'servers' AND column_name = 'icon'
+                            ) THEN
+                                ALTER TABLE servers ADD COLUMN icon VARCHAR(255) DEFAULT '🏠';
+                            END IF;
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name = 'servers' AND column_name = 'icon_type'
+                            ) THEN
+                                ALTER TABLE servers ADD COLUMN icon_type VARCHAR(50) DEFAULT 'emoji';
+                            END IF;
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name = 'servers' AND column_name = 'icon_data'
+                            ) THEN
+                                ALTER TABLE servers ADD COLUMN icon_data TEXT;
                             END IF;
                         END $$;
                     ''')
@@ -395,6 +423,25 @@ class Database:
             cursor.execute('''
                 UPDATE servers SET name = %s WHERE server_id = %s
             ''', (name, server_id))
+    
+    def update_server_icon(self, server_id: str, icon: str, icon_type: str, icon_data: Optional[str] = None) -> bool:
+        """Update server icon.
+        
+        Returns:
+            bool: True if the server was updated, False if no rows were affected
+            or if a database error occurred.
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    UPDATE servers 
+                    SET icon = %s, icon_type = %s, icon_data = %s
+                    WHERE server_id = %s
+                ''', (icon, icon_type, icon_data, server_id))
+                return cursor.rowcount > 0
+        except psycopg2.Error:
+            return False
     
     # Channel operations
     def create_channel(self, channel_id: str, server_id: str, name: str, channel_type: str = 'text') -> bool:

@@ -113,6 +113,9 @@ async def api_servers(request):
                     'id': server_id,
                     'name': server_data['name'],
                     'owner': server_data['owner'],
+                    'icon': server_data.get('icon', '🏠'),
+                    'icon_type': server_data.get('icon_type', 'emoji'),
+                    'icon_data': server_data.get('icon_data'),
                     'channels': [
                         {
                             'id': ch['channel_id'],

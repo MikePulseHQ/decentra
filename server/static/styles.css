@@ -1960,3 +1960,93 @@ body::before {
     background: #72767d;
     cursor: not-allowed;
 }
+
+/* Server Icon Styles */
+.server-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.server-icon {
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.server-icon img {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    object-fit: cover;
+}
+
+.server-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.server-icon-selector {
+    margin-top: 20px;
+}
+
+.icon-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid rgba(79, 84, 92, 0.48);
+}
+
+.icon-tab {
+    background: none;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: #b9bbbe;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s ease;
+    margin-bottom: -2px;
+}
+
+.icon-tab:hover {
+    color: #dcddde;
+    border-bottom-color: #b9bbbe;
+}
+
+.icon-tab.active {
+    color: #ffffff;
+    border-bottom-color: #5865F2;
+}
+
+.icon-tab-content {
+    margin-bottom: 20px;
+}
+
+.emoji-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.emoji-option {
+    font-size: 32px;
+    padding: 10px;
+    background: #2f3136;
+    border: 2px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.emoji-option:hover {
+    background: #40444b;
+    border-color: #5865F2;
+    transform: scale(1.05);
+}
