@@ -1016,8 +1016,9 @@
         }
         
         // Filter users based on query
+        const queryLower = query.toLowerCase();
         const filteredUsers = query 
-            ? availableUsers.filter(u => u.username.toLowerCase().startsWith(query.toLowerCase()))
+            ? availableUsers.filter(u => u.username.toLowerCase().startsWith(queryLower))
             : availableUsers;
         
         if (filteredUsers.length === 0) {
@@ -1032,6 +1033,11 @@
         header.className = 'mention-autocomplete-header';
         header.textContent = 'Mention';
         mentionAutocomplete.appendChild(header);
+        
+        // Reset selected index if it's out of bounds
+        if (selectedMentionIndex >= filteredUsers.length) {
+            selectedMentionIndex = 0;
+        }
         
         filteredUsers.forEach((user, index) => {
             const item = document.createElement('div');
@@ -1336,8 +1342,8 @@
             // Extract query after @
             const query = value.substring(atPos + 1, cursorPos);
             
-            // Only show autocomplete if query doesn't contain spaces
-            if (!query.includes(' ')) {
+            // Only show autocomplete if query doesn't contain whitespace
+            if (!/\s/.test(query)) {
                 mentionActive = true;
                 mentionStartPos = atPos;
                 mentionQuery = query;
