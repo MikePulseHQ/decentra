@@ -2538,8 +2538,15 @@
     
     // Close voice participants panel
     closeParticipantsBtn.addEventListener('click', () => {
+        // Hide the participants panel
         voiceParticipants.classList.add('hidden');
         voiceParticipants.classList.remove('active');
+
+        // Restore layout by removing the in-voice-call state from the main container
+        const inVoiceCallContainer = document.querySelector('.in-voice-call');
+        if (inVoiceCallContainer) {
+            inVoiceCallContainer.classList.remove('in-voice-call');
+        }
     });
     
     // Populate device selects
