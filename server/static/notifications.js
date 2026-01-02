@@ -325,7 +325,9 @@ class NotificationManager {
         // Check if this is a mention using word boundary regex
         let isMention = false;
         if (this.currentUsername) {
-            const mentionRegex = new RegExp(`@${this.currentUsername}\\b`, 'i');
+            // Escape special regex characters in username
+            const escapedUsername = this.currentUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const mentionRegex = new RegExp(`@${escapedUsername}\\b`, 'i');
             isMention = mentionRegex.test(message);
         }
         
