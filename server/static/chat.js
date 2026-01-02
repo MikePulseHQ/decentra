@@ -587,16 +587,22 @@
                 
             case 'voice_state_update':
                 if (voiceChat) {
-                    voiceChat.handleVoiceStateUpdate(data);
-                    
-                    // Initialize screen sharing state for all voice members
+                    // Initialize screen sharing state for all voice members BEFORE handling voice state,
+                    // so that any peer connections or incoming tracks can use the correct state.
+                    if (voiceChat.remoteScreenSharing && typeof voiceChat.remoteScreenSharing.clear === 'function') {
+                        voiceChat.remoteScreenSharing.clear();
+                    }
                     if (data.voice_members) {
                         data.voice_members.forEach(member => {
                             const memberUsername = typeof member === 'object' ? member.username : member;
                             const isScreenSharing = typeof member === 'object' ? member.screen_sharing : false;
-                            voiceChat.remoteScreenSharing.set(memberUsername, isScreenSharing);
+                            if (voiceChat.remoteScreenSharing && typeof voiceChat.remoteScreenSharing.set === 'function') {
+                                voiceChat.remoteScreenSharing.set(memberUsername, isScreenSharing);
+                            }
                         });
                     }
+
+                    voiceChat.handleVoiceStateUpdate(data);
                 }
                 // Update voice members display
                 const channelKey = `${data.server_id}/${data.channel_id}`;
