@@ -274,6 +274,45 @@
                         <button type="submit" class="btn btn-primary">Rename Server</button>
                     </div>
                 </form>
+                
+                <h4>Server Icon</h4>
+                <div class="server-icon-selector">
+                    <div class="icon-tabs">
+                        <button class="icon-tab active" data-tab="emoji">Emoji</button>
+                        <button class="icon-tab" data-tab="upload">Upload Image</button>
+                    </div>
+                    
+                    <div id="server-icon-tab-emoji" class="icon-tab-content">
+                        <p>Select an emoji for your server icon:</p>
+                        <div class="emoji-grid">
+                            <button class="emoji-option" data-emoji="🏠">🏠</button>
+                            <button class="emoji-option" data-emoji="🎮">🎮</button>
+                            <button class="emoji-option" data-emoji="💬">💬</button>
+                            <button class="emoji-option" data-emoji="🎵">🎵</button>
+                            <button class="emoji-option" data-emoji="🎨">🎨</button>
+                            <button class="emoji-option" data-emoji="🚀">🚀</button>
+                            <button class="emoji-option" data-emoji="⚡">⚡</button>
+                            <button class="emoji-option" data-emoji="🔥">🔥</button>
+                            <button class="emoji-option" data-emoji="💎">💎</button>
+                            <button class="emoji-option" data-emoji="🌟">🌟</button>
+                            <button class="emoji-option" data-emoji="🎯">🎯</button>
+                            <button class="emoji-option" data-emoji="🎪">🎪</button>
+                        </div>
+                    </div>
+                    
+                    <div id="server-icon-tab-upload" class="icon-tab-content hidden">
+                        <p>Upload a server icon (PNG, JPG, GIF - Max 2MB)</p>
+                        <div class="avatar-upload-area">
+                            <label for="server-icon-file-input" class="file-upload-label">
+                                <div class="file-upload-placeholder">
+                                    <span id="server-icon-preview">📁 Choose an image</span>
+                                </div>
+                            </label>
+                            <input type="file" id="server-icon-file-input" accept="image/*" style="display: none;">
+                            <button id="upload-server-icon-btn" class="btn btn-success hidden">Upload Icon</button>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <div id="settings-tab-channels" class="settings-tab-content hidden">

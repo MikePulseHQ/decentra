@@ -526,6 +526,16 @@
                     }
                 }
                 break;
+            
+            case 'server_icon_update':
+                const updatedServer = servers.find(s => s.id === data.server_id);
+                if (updatedServer) {
+                    updatedServer.icon = data.icon;
+                    updatedServer.icon_type = data.icon_type;
+                    updatedServer.icon_data = data.icon_data;
+                    updateServersList();
+                }
+                break;
                 
             case 'server_invite_code':
                 showServerInviteCode(data.code);
@@ -820,7 +830,27 @@
         servers.forEach(server => {
             const serverItem = document.createElement('div');
             serverItem.className = 'server-item';
-            serverItem.textContent = server.name;
+            
+            // Create server icon element
+            const serverIcon = document.createElement('span');
+            serverIcon.className = 'server-icon';
+            
+            if (server.icon_type === 'image' && server.icon_data) {
+                const iconImg = document.createElement('img');
+                iconImg.src = server.icon_data;
+                iconImg.alt = server.name;
+                serverIcon.appendChild(iconImg);
+            } else {
+                serverIcon.textContent = server.icon || '🏠';
+            }
+            
+            // Create server name element
+            const serverName = document.createElement('span');
+            serverName.className = 'server-name';
+            serverName.textContent = server.name;
+            
+            serverItem.appendChild(serverIcon);
+            serverItem.appendChild(serverName);
             serverItem.onclick = () => selectServer(server.id);
             serversList.appendChild(serverItem);
         });
@@ -1710,6 +1740,97 @@
         }));
         
         serverSettingsModal.classList.add('hidden');
+    });
+    
+    // Server icon tab switching
+    const iconTabs = document.querySelectorAll('.icon-tab');
+    const iconTabContents = document.querySelectorAll('.icon-tab-content');
+    
+    iconTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.tab;
+            
+            // Update active tab
+            iconTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // Show corresponding content
+            iconTabContents.forEach(content => {
+                if (content.id === `server-icon-tab-${tabName}`) {
+                    content.classList.remove('hidden');
+                } else {
+                    content.classList.add('hidden');
+                }
+            });
+        });
+    });
+    
+    // Server icon emoji selection
+    const emojiOptions = document.querySelectorAll('.emoji-option');
+    emojiOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            const emoji = option.dataset.emoji;
+            if (!currentlySelectedServer) return;
+            
+            ws.send(JSON.stringify({
+                type: 'set_server_icon',
+                server_id: currentlySelectedServer,
+                icon_type: 'emoji',
+                icon: emoji
+            }));
+            
+            showNotification('Server icon updated!');
+        });
+    });
+    
+    // Handle server icon image upload
+    const serverIconFileInput = document.getElementById('server-icon-file-input');
+    const serverIconPreview = document.getElementById('server-icon-preview');
+    const uploadServerIconBtn = document.getElementById('upload-server-icon-btn');
+    let selectedServerIconFile = null;
+    
+    serverIconFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                alert('Please select an image file');
+                return;
+            }
+            
+            // Validate file size (2MB)
+            if (file.size > 2 * 1024 * 1024) {
+                alert('Image is too large. Maximum size is 2MB.');
+                return;
+            }
+            
+            selectedServerIconFile = file;
+            serverIconPreview.textContent = `📷 ${file.name}`;
+            uploadServerIconBtn.classList.remove('hidden');
+        }
+    });
+    
+    uploadServerIconBtn.addEventListener('click', () => {
+        if (!selectedServerIconFile || !currentlySelectedServer) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const base64Data = e.target.result;
+            
+            ws.send(JSON.stringify({
+                type: 'set_server_icon',
+                server_id: currentlySelectedServer,
+                icon_type: 'image',
+                icon_data: base64Data
+            }));
+            
+            showNotification('Server icon uploaded!');
+            uploadServerIconBtn.classList.add('hidden');
+            selectedServerIconFile = null;
+            serverIconPreview.textContent = '📁 Choose an image';
+            serverIconFileInput.value = '';
+        };
+        reader.readAsDataURL(selectedServerIconFile);
     });
     
     // Generate server invite
