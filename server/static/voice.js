@@ -299,6 +299,11 @@ class VoiceChat {
                     });
                 });
                 
+                // Show local video preview
+                if (window.onLocalVideoTrack) {
+                    window.onLocalVideoTrack(this.localVideoStream);
+                }
+                
                 // Notify server
                 this.ws.send(JSON.stringify({
                     type: 'voice_video',
@@ -409,6 +414,11 @@ class VoiceChat {
                     }
                 });
                 
+                // Show local screen share preview
+                if (window.onLocalVideoTrack) {
+                    window.onLocalVideoTrack(this.localScreenStream);
+                }
+                
                 // Notify server
                 this.ws.send(JSON.stringify({
                     type: 'voice_screen_share',
@@ -450,6 +460,15 @@ class VoiceChat {
             
             this.isScreenSharing = false;
             
+            // Restore camera preview if video is enabled, otherwise remove preview
+            if (window.onLocalVideoTrack) {
+                if (this.isVideoEnabled && this.localVideoStream) {
+                    window.onLocalVideoTrack(this.localVideoStream);
+                } else {
+                    window.onLocalVideoTrack(null);
+                }
+            }
+            
             // Notify server
             this.ws.send(JSON.stringify({
                 type: 'voice_screen_share',
@@ -486,6 +505,15 @@ class VoiceChat {
         }
         
         this.isScreenSharing = false;
+        
+        // Restore camera preview if video is enabled, otherwise remove preview
+        if (window.onLocalVideoTrack) {
+            if (this.isVideoEnabled && this.localVideoStream) {
+                window.onLocalVideoTrack(this.localVideoStream);
+            } else {
+                window.onLocalVideoTrack(null);
+            }
+        }
         
         // Notify server
         this.ws.send(JSON.stringify({
