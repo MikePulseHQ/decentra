@@ -4,7 +4,6 @@ Test script to validate server icon feature
 """
 
 import sys
-import os
 
 # Test 1: Check that database methods exist
 print("Test 1: Checking database module...")
