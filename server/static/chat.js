@@ -588,6 +588,15 @@
             case 'voice_state_update':
                 if (voiceChat) {
                     voiceChat.handleVoiceStateUpdate(data);
+                    
+                    // Initialize screen sharing state for all voice members
+                    if (data.voice_members) {
+                        data.voice_members.forEach(member => {
+                            const memberUsername = typeof member === 'object' ? member.username : member;
+                            const isScreenSharing = typeof member === 'object' ? member.screen_sharing : false;
+                            voiceChat.remoteScreenSharing.set(memberUsername, isScreenSharing);
+                        });
+                    }
                 }
                 // Update voice members display
                 const channelKey = `${data.server_id}/${data.channel_id}`;
@@ -2125,11 +2134,14 @@
         voiceParticipants.classList.remove('active');
         voiceParticipants.classList.add('hidden');
         
-        // Restore members sidebar if it was visible
-        if (currentlySelectedServer && !rightSidebar.classList.contains('hidden')) {
-            rightSidebar.classList.remove('collapsed');
-            toggleMembersBtn.textContent = '◀';
-            toggleMembersBtn.title = 'Collapse';
+        // Restore members sidebar if it was visible before the call
+        // Only restore if we're currently viewing a server
+        if (currentlySelectedServer) {
+            if (!rightSidebar.classList.contains('hidden')) {
+                rightSidebar.classList.remove('collapsed');
+                toggleMembersBtn.textContent = '◀';
+                toggleMembersBtn.title = 'Collapse';
+            }
         }
         
         // Clear video elements
@@ -2692,6 +2704,9 @@
             remoteVideos.appendChild(videoContainer);
         }
         
+        // Update grid layout based on video count
+        updateVideoGridLayout();
+        
         // Make sure voice participants panel is visible
         if (!voiceParticipants.classList.contains('active')) {
             voiceParticipants.classList.add('active');
@@ -2727,13 +2742,35 @@
             videoContainer.appendChild(label);
             remoteVideos.appendChild(videoContainer);
             
+            // Update grid layout
+            updateVideoGridLayout();
+            
             // Make sure voice participants panel is visible
             if (!voiceParticipants.classList.contains('active')) {
                 voiceParticipants.classList.add('active');
                 voiceParticipants.classList.remove('hidden');
             }
+        } else {
+            // Update grid layout after removing video
+            updateVideoGridLayout();
         }
     };
+    
+    // Update video grid layout based on number of videos
+    function updateVideoGridLayout() {
+        const videoCount = remoteVideos.querySelectorAll('.remote-video-container:not(.screen-share)').length;
+        
+        // Remove all grid classes
+        remoteVideos.classList.remove('grid-2', 'grid-3');
+        
+        // Add appropriate grid class based on count
+        if (videoCount >= 5) {
+            remoteVideos.classList.add('grid-3');
+        } else if (videoCount >= 2) {
+            remoteVideos.classList.add('grid-2');
+        }
+        // 1 video or 0 videos uses default single column
+    }
     
     // Scroll to bottom of messages
     function scrollToBottom() {

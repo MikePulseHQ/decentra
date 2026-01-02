@@ -1395,30 +1395,18 @@ body::before {
 .remote-videos {
     padding: 10px;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: 1fr;
     gap: 10px;
     max-height: 70vh;
     overflow-y: auto;
 }
 
-/* Grid layouts for different numbers of videos */
-.remote-videos:has(.remote-video-container:nth-child(1):last-child) {
-    grid-template-columns: 1fr;
-}
-
-.remote-videos:has(.remote-video-container:nth-child(2)) {
+/* Grid layouts for different numbers of videos - set via JS */
+.remote-videos.grid-2 {
     grid-template-columns: repeat(2, 1fr);
 }
 
-.remote-videos:has(.remote-video-container:nth-child(3)) {
-    grid-template-columns: repeat(2, 1fr);
-}
-
-.remote-videos:has(.remote-video-container:nth-child(4)) {
-    grid-template-columns: repeat(2, 1fr);
-}
-
-.remote-videos:has(.remote-video-container:nth-child(5)) {
+.remote-videos.grid-3 {
     grid-template-columns: repeat(3, 1fr);
 }
 

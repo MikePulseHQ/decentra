@@ -355,28 +355,27 @@ class VoiceChat {
         if (!this.isScreenSharing) {
             // Start screen sharing
             try {
+                // Normalize inputs to integers
+                const res = parseInt(resolution || this.screenShareResolution);
+                const fps = parseInt(framerate || this.screenShareFramerate);
+                
                 // Calculate dimensions based on resolution setting
                 let width, height;
-                switch (resolution || this.screenShareResolution) {
+                switch (res) {
                     case 1080:
-                    case '1080':
                         width = 1920;
                         height = 1080;
                         break;
                     case 480:
-                    case '480':
                         width = 854;
                         height = 480;
                         break;
                     case 720:
-                    case '720':
                     default:
                         width = 1280;
                         height = 720;
                         break;
                 }
-                
-                const fps = parseInt(framerate || this.screenShareFramerate);
                 
                 this.localScreenStream = await navigator.mediaDevices.getDisplayMedia({
                     video: { 
