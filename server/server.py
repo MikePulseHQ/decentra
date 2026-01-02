@@ -1077,9 +1077,13 @@ async def handler(websocket):
                             if username in member_usernames:
                                 members_list = []
                                 for member in members:
+                                    # Get avatar data for the member
+                                    avatar_data = get_avatar_data(member['username'])
+                                    
                                     member_data = {
                                         'username': member['username'],
-                                        'is_owner': member['username'] == server['owner']
+                                        'is_owner': member['username'] == server['owner'],
+                                        **avatar_data
                                     }
                                     if member['username'] != server['owner']:
                                         member_data['permissions'] = {

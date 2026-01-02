@@ -648,12 +648,14 @@ class Database:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT id, username, content, 
-                       timestamp::text as timestamp,
-                       context_type, context_id
-                FROM messages 
-                WHERE context_type = %s AND context_id = %s
-                ORDER BY timestamp DESC
+                SELECT m.id, m.username, m.content, 
+                       m.timestamp::text as timestamp,
+                       m.context_type, m.context_id,
+                       u.avatar, u.avatar_type, u.avatar_data
+                FROM messages m
+                LEFT JOIN users u ON m.username = u.username
+                WHERE m.context_type = %s AND m.context_id = %s
+                ORDER BY m.timestamp DESC
                 LIMIT %s
             ''', (context_type, context_id, limit))
             # Reverse to get chronological order and return as list of dicts
