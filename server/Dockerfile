@@ -10,6 +10,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY server.py .
 COPY database.py .
 COPY api.py .
+COPY encryption_utils.py .
+COPY email_utils.py .
 COPY static/ ./static/
 
 # Expose WebSocket port
