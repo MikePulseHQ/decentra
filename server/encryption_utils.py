@@ -73,6 +73,9 @@ class EncryptionManager:
             
         Returns:
             str: Base64-encoded encrypted string
+            
+        Raises:
+            RuntimeError: If encryption fails
         """
         if not plaintext:
             return ''
@@ -81,15 +84,19 @@ class EncryptionManager:
             encrypted_bytes = self.fernet.encrypt(plaintext.encode('utf-8'))
             return base64.urlsafe_b64encode(encrypted_bytes).decode('utf-8')
         except Exception as e:
-            print(f"[Encryption] Error encrypting data: {e}")
-            return plaintext  # Fallback to plaintext on error
+            error_msg = f"[Encryption] Critical error encrypting data: {e}"
+            print(error_msg)
+            raise RuntimeError(error_msg) from e
     
     def decrypt(self, encrypted: str) -> str:
         """
         Decrypt an encrypted string.
         
+        Provides backward compatibility by detecting plaintext data and returning it as-is.
+        This allows migration from plaintext to encrypted storage without breaking existing data.
+        
         Args:
-            encrypted: Base64-encoded encrypted string
+            encrypted: Base64-encoded encrypted string (or plaintext for backward compatibility)
             
         Returns:
             str: Decrypted plaintext string
@@ -97,14 +104,24 @@ class EncryptionManager:
         if not encrypted:
             return ''
         
+        # First check if this looks like encrypted data
         try:
             encrypted_bytes = base64.urlsafe_b64decode(encrypted.encode('utf-8'))
             decrypted_bytes = self.fernet.decrypt(encrypted_bytes)
             return decrypted_bytes.decode('utf-8')
-        except Exception as e:
-            # If decryption fails, it might be plaintext (for backward compatibility)
-            print(f"[Encryption] Error decrypting data (might be plaintext): {e}")
-            return encrypted  # Return as-is if decryption fails
+        except Exception:
+            # If decryption fails, check if it's valid base64 encrypted data
+            # If not, it's likely plaintext (for backward compatibility)
+            try:
+                # Try to verify it's at least valid base64
+                base64.urlsafe_b64decode(encrypted.encode('utf-8'))
+                # If we get here, it's base64 but invalid encryption
+                print(f"[Encryption] Warning: Data appears encrypted but decryption failed. Possible key mismatch.")
+                raise RuntimeError("Failed to decrypt data - encryption key may have changed")
+            except Exception:
+                # Not valid base64, assume it's plaintext (backward compatibility)
+                print(f"[Encryption] Warning: Detected plaintext data. Consider re-encrypting for security.")
+                return encrypted
     
     def is_encrypted(self, data: str) -> bool:
         """

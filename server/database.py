@@ -410,8 +410,13 @@ class Database:
                 
                 # Decrypt SMTP password if present
                 if settings.get('smtp_password'):
-                    encryption_manager = get_encryption_manager()
-                    settings['smtp_password'] = encryption_manager.decrypt(settings['smtp_password'])
+                    try:
+                        encryption_manager = get_encryption_manager()
+                        settings['smtp_password'] = encryption_manager.decrypt(settings['smtp_password'])
+                    except RuntimeError as e:
+                        print(f"Error decrypting SMTP password: {e}")
+                        # Return empty password if decryption fails with key mismatch
+                        settings['smtp_password'] = ''
                 
                 return settings
             return {}
@@ -429,8 +434,13 @@ class Database:
                     if key not in ['id', 'created_at', 'updated_at']:
                         # Encrypt SMTP password before storing
                         if key == 'smtp_password' and value:
-                            encryption_manager = get_encryption_manager()
-                            value = encryption_manager.encrypt(value)
+                            try:
+                                encryption_manager = get_encryption_manager()
+                                value = encryption_manager.encrypt(value)
+                            except RuntimeError as e:
+                                print(f"Error encrypting SMTP password: {e}")
+                                # Return False to indicate save failure
+                                return False
                         
                         set_clauses.append(f"{key} = %s")
                         values.append(value)
