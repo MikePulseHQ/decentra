@@ -1419,7 +1419,8 @@ async def handler(websocket):
                                     'server_id': server_id,
                                     'muted': False,
                                     'video': False,
-                                    'screen_sharing': False
+                                    'screen_sharing': False,
+                                    'showing_screen': False
                                 }
                                 
                                 # Get current voice members with state details
@@ -1432,7 +1433,8 @@ async def handler(websocket):
                                         **member_avatar,
                                         'muted': member_state.get('muted', False),
                                         'video': member_state.get('video', False),
-                                        'screen_sharing': member_state.get('screen_sharing', False)
+                                        'screen_sharing': member_state.get('screen_sharing', False),
+                                        'showing_screen': member_state.get('showing_screen', False)
                                     })
                                 
                                 # Notify all server members about voice state change
@@ -1469,7 +1471,8 @@ async def handler(websocket):
                                             **member_avatar,
                                             'muted': member_state.get('muted', False),
                                             'video': member_state.get('video', False),
-                                            'screen_sharing': member_state.get('screen_sharing', False)
+                                            'screen_sharing': member_state.get('screen_sharing', False),
+                                            'showing_screen': member_state.get('showing_screen', False)
                                         })
                                     
                                     # Notify all server members
@@ -1693,6 +1696,50 @@ async def handler(websocket):
                                     'screen_sharing': screen_sharing
                                 }))
                     
+                    elif data.get('type') == 'switch_video_source':
+                        # Forward request to switch video source to the target user,
+                        # but only if both users are in the same voice channel
+                        target_user = data.get('target')
+                        show_screen = data.get('show_screen', True)
+                        
+                        if target_user:
+                            requester_state = voice_states.get(username)
+                            target_state = voice_states.get(target_user)
+
+                            # Ensure both users are in a voice channel and in the same one
+                            if (
+                                requester_state
+                                and target_state
+                                and requester_state.get('server_id') == target_state.get('server_id')
+                                and requester_state.get('channel_id') == target_state.get('channel_id')
+                            ):
+                                await send_to_user(target_user, json.dumps({
+                                    'type': 'switch_video_source_request',
+                                    'from': username,
+                                    'show_screen': show_screen
+                                }))
+                            else:
+                                # Reject unauthorized switch requests
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': 'Cannot request video source switch: target user is not in the same voice channel'
+                                }))
+                    
+                    elif data.get('type') == 'video_source_changed':
+                        # Broadcast to others in voice channel that video source has changed
+                        if username in voice_states:
+                            showing_screen = data.get('showing_screen', False)
+                            voice_states[username]['showing_screen'] = showing_screen
+                            state = voice_states[username]
+                            
+                            # Notify others in the same voice channel
+                            if state.get('server_id') and state.get('channel_id'):
+                                await broadcast_to_server(state['server_id'], json.dumps({
+                                    'type': 'video_source_changed_update',
+                                    'username': username,
+                                    'showing_screen': showing_screen
+                                }))
+                    
                     # WebRTC signaling
                     elif data.get('type') == 'webrtc_offer':
                         target_user = data.get('target')
@@ -1799,7 +1846,8 @@ async def handler(websocket):
                                 **member_avatar,
                                 'muted': member_state.get('muted', False),
                                 'video': member_state.get('video', False),
-                                'screen_sharing': member_state.get('screen_sharing', False)
+                                'screen_sharing': member_state.get('screen_sharing', False),
+                                'showing_screen': member_state.get('showing_screen', False)
                             })
                         
                         # Notify all server members

@@ -1406,6 +1406,31 @@ body::before {
     background: rgba(0, 0, 0, 0.9);
 }
 
+/* Toggle video source button (for switching between camera and screen) */
+.toggle-video-btn {
+    position: absolute;
+    bottom: 50px;
+    right: 10px;
+    background: rgba(37, 99, 235, 0.9);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 10;
+}
+
+.video-container:hover .toggle-video-btn {
+    opacity: 1;
+}
+
+.toggle-video-btn:hover {
+    background: rgba(37, 99, 235, 1);
+}
+
 /* Maximized video display */
 .maximized-video-container {
     position: absolute;

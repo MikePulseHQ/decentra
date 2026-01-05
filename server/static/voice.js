@@ -19,6 +19,9 @@ class VoiceChat {
         this.selectedCameraId = null;
         this.setSinkIdWarningShown = false; // Track if setSinkId warning has been shown
         this.remoteScreenSharing = new Map(); // Track which peers are screen sharing
+        this.remoteVideoEnabled = new Map(); // Track which peers have video enabled
+        this.remoteShowingScreen = new Map(); // Track which peers are currently showing screen (vs camera)
+        this.showingScreen = true; // Default/preferred source when both video and screenshare are active (true = screen, false = camera)
         
         // Video configuration constants
         this.VIDEO_WIDTH = 640;
@@ -418,11 +421,22 @@ class VoiceChat {
                     window.onLocalVideoTrack(this.localScreenStream, true);
                 }
                 
+                // Update state - now showing screen
+                this.showingScreen = true;
+                
                 // Notify server
                 this.ws.send(JSON.stringify({
                     type: 'voice_screen_share',
                     screen_sharing: true
                 }));
+                
+                // If video is also enabled, notify that we're now showing screen
+                if (this.isVideoEnabled) {
+                    this.ws.send(JSON.stringify({
+                        type: 'video_source_changed',
+                        showing_screen: true
+                    }));
+                }
                 
                 return true;
             } catch (error) {
@@ -433,47 +447,8 @@ class VoiceChat {
                 return false;
             }
         } else {
-            // Stop screen sharing
-            if (this.localScreenStream) {
-                this.localScreenStream.getTracks().forEach(track => track.stop());
-                
-                // Restore video track or remove screen track from all peer connections
-                this.peerConnections.forEach(pc => {
-                    const senders = pc.getSenders();
-                    const videoSender = senders.find(s => s.track && s.track.kind === 'video');
-                    
-                    if (videoSender) {
-                        if (this.isVideoEnabled && this.localVideoStream) {
-                            // Restore camera video
-                            const videoTrack = this.localVideoStream.getVideoTracks()[0];
-                            videoSender.replaceTrack(videoTrack);
-                        } else {
-                            // Remove video track
-                            pc.removeTrack(videoSender);
-                        }
-                    }
-                });
-                
-                this.localScreenStream = null;
-            }
-            
-            this.isScreenSharing = false;
-            
-            // Restore camera preview if video is enabled, otherwise remove preview
-            if (window.onLocalVideoTrack) {
-                if (this.isVideoEnabled && this.localVideoStream) {
-                    window.onLocalVideoTrack(this.localVideoStream, false);
-                } else {
-                    window.onLocalVideoTrack(null, false);
-                }
-            }
-            
-            // Notify server
-            this.ws.send(JSON.stringify({
-                type: 'voice_screen_share',
-                screen_sharing: false
-            }));
-            
+            // Stop screen sharing by calling the helper method
+            this.stopScreenSharing();
             return false;
         }
     }
@@ -505,6 +480,9 @@ class VoiceChat {
         
         this.isScreenSharing = false;
         
+        // Update state
+        this.showingScreen = false;
+        
         // Restore camera preview if video is enabled, otherwise remove preview
         if (window.onLocalVideoTrack) {
             if (this.isVideoEnabled && this.localVideoStream) {
@@ -518,6 +496,85 @@ class VoiceChat {
         this.ws.send(JSON.stringify({
             type: 'voice_screen_share',
             screen_sharing: false
+        }));
+        
+        // If video is still enabled, notify that we're now showing camera
+        if (this.isVideoEnabled) {
+            this.ws.send(JSON.stringify({
+                type: 'video_source_changed',
+                showing_screen: false
+            }));
+        }
+    }
+    
+    // Switch between showing camera or screen when both are active
+    switchVideoSource(targetUsername, showScreen) {
+        // Send message to the target user to switch their sent video track
+        this.ws.send(JSON.stringify({
+            type: 'switch_video_source',
+            target: targetUsername,
+            show_screen: showScreen
+        }));
+    }
+    
+    // Handle request from another user to switch our sent video track
+    async handleSwitchVideoSourceRequest(showScreen) {
+        // Only applicable if we have both video and screenshare active
+        if (!this.isVideoEnabled || !this.isScreenSharing) {
+            return;
+        }
+        
+        // Verify streams exist
+        if (!this.localVideoStream || !this.localScreenStream) {
+            console.warn('Cannot switch video source: streams not available');
+            return;
+        }
+        
+        // Verify the target stream has video tracks before proceeding
+        const sourceStream = showScreen ? this.localScreenStream : this.localVideoStream;
+        const videoTracks = sourceStream.getVideoTracks();
+        if (videoTracks.length === 0) {
+            console.warn('No video tracks available for replacement from', showScreen ? 'screen stream' : 'video stream');
+            return;
+        }
+        
+        this.showingScreen = showScreen;
+        const newTrack = videoTracks[0];
+        
+        // Switch the track being sent to all peers
+        const replacePromises = [];
+        this.peerConnections.forEach(pc => {
+            const senders = pc.getSenders();
+            const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+            
+            if (videoSender) {
+                replacePromises.push(videoSender.replaceTrack(newTrack));
+            }
+        });
+        
+        // Wait for all track replacements to complete with error handling
+        try {
+            await Promise.all(replacePromises);
+        } catch (error) {
+            console.error('Error replacing video tracks:', error);
+            // Revert state on failure
+            this.showingScreen = !showScreen;
+            throw error;
+        }
+        
+        // Update local preview
+        if (window.onLocalVideoTrack) {
+            if (showScreen) {
+                window.onLocalVideoTrack(this.localScreenStream, true);
+            } else {
+                window.onLocalVideoTrack(this.localVideoStream, false);
+            }
+        }
+        
+        // Notify server about the current video source being sent
+        this.ws.send(JSON.stringify({
+            type: 'video_source_changed',
+            showing_screen: showScreen
         }));
     }
     
@@ -584,6 +641,11 @@ class VoiceChat {
         this.isMuted = false;
         this.isVideoEnabled = false;
         this.isScreenSharing = false;
+        
+        // Clear remote state tracking
+        this.remoteVideoEnabled.clear();
+        this.remoteScreenSharing.clear();
+        this.remoteShowingScreen.clear();
     }
     
     async startDirectCall(friendUsername) {
