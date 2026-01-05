@@ -684,6 +684,12 @@
                         );
                         if (participant && typeof participant === 'object') {
                             participant.video = data.video;
+                            // Track in voiceChat for toggle functionality
+                            if (voiceChat) {
+                                voiceChat.remoteVideoEnabled.set(data.username, data.video);
+                                // Update toggle button if both video and screenshare are active
+                                updateVideoToggleButton(data.username);
+                            }
                             updateVoiceParticipants(voiceMembers[currentKey]);
                         }
                     }
@@ -703,6 +709,8 @@
                             // Track in voiceChat for video display
                             if (voiceChat) {
                                 voiceChat.remoteScreenSharing.set(data.username, data.screen_sharing);
+                                // Update toggle button if both video and screenshare are active
+                                updateVideoToggleButton(data.username);
                             }
                             // When screen sharing stops, remove any existing screen share video element
                             if (!data.screen_sharing) {
@@ -717,7 +725,14 @@
                     }
                 }
                 break;
-                
+            
+            case 'switch_video_source_request':
+                // Handle request from another user to switch our video source
+                if (voiceChat) {
+                    voiceChat.handleSwitchVideoSourceRequest(data.show_screen);
+                }
+                break;
+            
             case 'incoming_voice_call':
                 handleIncomingCall(data.from);
                 break;
@@ -2907,6 +2922,9 @@
         videoContainer.appendChild(label);
         videoContainer.appendChild(maximizeBtn);
         
+        // Add toggle button if both video and screenshare are active
+        // The toggle button will be added/updated by updateVideoToggleButton function
+        
         // Add click to maximize on the whole container
         videoContainer.addEventListener('click', () => {
             maximizeVideo(video, username, isScreenShare);
@@ -2921,6 +2939,9 @@
         
         // Update grid layout based on video count
         updateVideoGridLayout();
+        
+        // Check if toggle button should be shown
+        updateVideoToggleButton(username);
     };
     
     // Handle local video track (when user enables their own camera or screen share)
@@ -2994,6 +3015,46 @@
             videoGrid.classList.add('grid-2');
         }
         // 1 video or 0 videos uses default single column
+    }
+    
+    // Update or add toggle button for switching between video and screenshare
+    function updateVideoToggleButton(username) {
+        if (!voiceChat) return;
+        
+        const hasVideo = voiceChat.remoteVideoEnabled.get(username) || false;
+        const hasScreenShare = voiceChat.remoteScreenSharing.get(username) || false;
+        const videoContainer = document.getElementById(`video-${username}`);
+        
+        if (!videoContainer) return;
+        
+        // Check if both video and screenshare are active
+        const bothActive = hasVideo && hasScreenShare;
+        
+        // Remove existing toggle button if present
+        const existingToggleBtn = videoContainer.querySelector('.toggle-video-btn');
+        if (existingToggleBtn) {
+            existingToggleBtn.remove();
+        }
+        
+        if (bothActive) {
+            // Add toggle button
+            const toggleBtn = document.createElement('button');
+            toggleBtn.className = 'toggle-video-btn';
+            const isShowingScreen = videoContainer.classList.contains('screen-share');
+            toggleBtn.textContent = isShowingScreen ? '📹 Show Camera' : '🖥️ Show Screen';
+            toggleBtn.title = isShowingScreen ? 'Switch to camera view' : 'Switch to screen share';
+            toggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Toggle between screen and camera
+                const newShowScreen = !isShowingScreen;
+                voiceChat.switchVideoSource(username, newShowScreen);
+                // Update button immediately for responsiveness
+                toggleBtn.textContent = newShowScreen ? '📹 Show Camera' : '🖥️ Show Screen';
+                toggleBtn.title = newShowScreen ? 'Switch to camera view' : 'Switch to screen share';
+            });
+            
+            videoContainer.appendChild(toggleBtn);
+        }
     }
     
     // Scroll to bottom of messages

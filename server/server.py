@@ -1672,6 +1672,18 @@ async def handler(websocket):
                                     'screen_sharing': screen_sharing
                                 }))
                     
+                    elif data.get('type') == 'switch_video_source':
+                        # Forward request to switch video source to the target user
+                        target_user = data.get('target')
+                        show_screen = data.get('show_screen', True)
+                        
+                        if target_user:
+                            await send_to_user(target_user, json.dumps({
+                                'type': 'switch_video_source_request',
+                                'from': username,
+                                'show_screen': show_screen
+                            }))
+                    
                     # WebRTC signaling
                     elif data.get('type') == 'webrtc_offer':
                         target_user = data.get('target')

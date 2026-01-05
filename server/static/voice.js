@@ -19,6 +19,8 @@ class VoiceChat {
         this.selectedCameraId = null;
         this.setSinkIdWarningShown = false; // Track if setSinkId warning has been shown
         this.remoteScreenSharing = new Map(); // Track which peers are screen sharing
+        this.remoteVideoEnabled = new Map(); // Track which peers have video enabled
+        this.showingScreenShare = true; // When both video and screenshare active, which is being sent (true = screen, false = camera)
         
         // Video configuration constants
         this.VIDEO_WIDTH = 640;
@@ -519,6 +521,48 @@ class VoiceChat {
             type: 'voice_screen_share',
             screen_sharing: false
         }));
+    }
+    
+    // Switch between showing camera or screen when both are active
+    switchVideoSource(targetUsername, showScreen) {
+        // Send message to the target user to switch their sent video track
+        this.ws.send(JSON.stringify({
+            type: 'switch_video_source',
+            target: targetUsername,
+            show_screen: showScreen
+        }));
+    }
+    
+    // Handle request from another user to switch our sent video track
+    handleSwitchVideoSourceRequest(showScreen) {
+        // Only applicable if we have both video and screenshare active
+        if (!this.isVideoEnabled || !this.isScreenSharing) {
+            return;
+        }
+        
+        this.showingScreenShare = showScreen;
+        
+        // Switch the track being sent to all peers
+        this.peerConnections.forEach(pc => {
+            const senders = pc.getSenders();
+            const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+            
+            if (videoSender) {
+                const newTrack = showScreen ? 
+                    this.localScreenStream.getVideoTracks()[0] : 
+                    this.localVideoStream.getVideoTracks()[0];
+                videoSender.replaceTrack(newTrack);
+            }
+        });
+        
+        // Update local preview
+        if (window.onLocalVideoTrack) {
+            if (showScreen) {
+                window.onLocalVideoTrack(this.localScreenStream, true);
+            } else {
+                window.onLocalVideoTrack(this.localVideoStream, false);
+            }
+        }
     }
     
     async joinVoiceChannel(serverId, channelId) {
