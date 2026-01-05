@@ -102,8 +102,8 @@ cp .env.example .env
 
 2. First, start PostgreSQL (using your .env values):
 ```bash
-# Load environment variables
-source .env
+# Load environment variables (use one of these methods)
+export $(cat .env | grep -v '^#' | xargs)
 
 docker run -d --name decentra-postgres \
   -e POSTGRES_DB=${POSTGRES_DB} \
@@ -122,6 +122,8 @@ docker run -p 8765:8765 \
   --link decentra-postgres \
   decentra-server
 ```
+
+**Note**: For easier management, consider using docker-compose instead of running containers manually. Docker Compose automatically loads the .env file.
 
 Then open your browser to `http://localhost:8765`
 
