@@ -229,6 +229,61 @@ class Database:
                         END $$;
                     ''')
                     
+                    # Add SMTP settings columns if they don't exist (migration)
+                    cursor.execute('''
+                        DO $$ 
+                        BEGIN
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name = 'admin_settings' AND column_name = 'smtp_enabled'
+                            ) THEN
+                                ALTER TABLE admin_settings ADD COLUMN smtp_enabled BOOLEAN DEFAULT FALSE;
+                            END IF;
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name = 'admin_settings' AND column_name = 'smtp_host'
+                            ) THEN
+                                ALTER TABLE admin_settings ADD COLUMN smtp_host VARCHAR(255) DEFAULT '';
+                            END IF;
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name = 'admin_settings' AND column_name = 'smtp_port'
+                            ) THEN
+                                ALTER TABLE admin_settings ADD COLUMN smtp_port INTEGER DEFAULT 587;
+                            END IF;
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name = 'admin_settings' AND column_name = 'smtp_username'
+                            ) THEN
+                                ALTER TABLE admin_settings ADD COLUMN smtp_username VARCHAR(255) DEFAULT '';
+                            END IF;
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name = 'admin_settings' AND column_name = 'smtp_password'
+                            ) THEN
+                                ALTER TABLE admin_settings ADD COLUMN smtp_password VARCHAR(255) DEFAULT '';
+                            END IF;
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name = 'admin_settings' AND column_name = 'smtp_from_email'
+                            ) THEN
+                                ALTER TABLE admin_settings ADD COLUMN smtp_from_email VARCHAR(255) DEFAULT '';
+                            END IF;
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name = 'admin_settings' AND column_name = 'smtp_from_name'
+                            ) THEN
+                                ALTER TABLE admin_settings ADD COLUMN smtp_from_name VARCHAR(255) DEFAULT 'Decentra';
+                            END IF;
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name = 'admin_settings' AND column_name = 'smtp_use_tls'
+                            ) THEN
+                                ALTER TABLE admin_settings ADD COLUMN smtp_use_tls BOOLEAN DEFAULT TRUE;
+                            END IF;
+                        END $$;
+                    ''')
+                    
                     # Add server icon columns if they don't exist (migration)
                     cursor.execute('''
                         DO $$ 
