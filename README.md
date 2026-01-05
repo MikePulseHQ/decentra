@@ -48,26 +48,42 @@ git clone https://github.com/SluberskiHomeLab/decentra.git
 cd decentra
 ```
 
-2. Start the server:
+2. Set up environment variables:
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` and update the database credentials (especially the password):
+```env
+# PostgreSQL Database Configuration
+POSTGRES_DB=decentra
+POSTGRES_USER=decentra
+POSTGRES_PASSWORD=your_secure_password_here
+
+# Server Configuration
+DATABASE_URL=postgresql://decentra:your_secure_password_here@postgres:5432/decentra
+```
+
+3. Start the server:
 ```bash
 docker-compose up --build
 ```
 
 This will start both the PostgreSQL database and the chat server on port 8765 with persistent data storage in a Docker volume.
 
-3. Open your web browser and navigate to:
+4. Open your web browser and navigate to:
 ```
 http://localhost:8765
 ```
 
-4. Create an account or log in to start chatting!
+5. Create an account or log in to start chatting!
 
-5. To stop the server (data will persist):
+6. To stop the server (data will persist):
 ```bash
 docker-compose down
 ```
 
-6. To completely remove all data and start fresh:
+7. To completely remove all data and start fresh:
 ```bash
 docker-compose down -v
 ```
@@ -78,25 +94,37 @@ docker-compose down -v
 
 If you want to run the components separately:
 
-1. First, start PostgreSQL:
+1. Set up your environment variables (same as above):
+```bash
+cp .env.example .env
+# Edit .env with your credentials
+```
+
+2. First, start PostgreSQL:
 ```bash
 docker run -d --name decentra-postgres \
-  -e POSTGRES_DB=decentra \
-  -e POSTGRES_USER=decentra \
-  -e POSTGRES_PASSWORD=decentra \
+  --env-file .env \
   -v decentra-data:/var/lib/postgresql/data \
   postgres:16-alpine
 ```
 
-2. Then, build and run the server:
+3. Then, build and run the server:
 ```bash
+# Load environment variables into shell for variable expansion in docker run command
+# This is needed because we construct DATABASE_URL with the container hostname
+set -a
+source .env
+set +a
+
 cd server
 docker build -t decentra-server .
 docker run -p 8765:8765 \
-  -e DATABASE_URL=postgresql://decentra:decentra@decentra-postgres:5432/decentra \
+  -e DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@decentra-postgres:5432/${POSTGRES_DB} \
   --link decentra-postgres \
   decentra-server
 ```
+
+**Note**: For easier management, consider using docker-compose instead of running containers manually. Docker Compose automatically loads the .env file.
 
 Then open your browser to `http://localhost:8765`
 
