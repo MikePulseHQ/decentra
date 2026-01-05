@@ -102,7 +102,7 @@ cp .env.example .env
 
 2. First, start PostgreSQL (using your .env values):
 ```bash
-# Load environment variables (use one of these methods)
+# Load environment variables
 export $(cat .env | grep -v '^#' | xargs)
 
 docker run -d --name decentra-postgres \
@@ -118,7 +118,7 @@ docker run -d --name decentra-postgres \
 cd server
 docker build -t decentra-server .
 docker run -p 8765:8765 \
-  -e DATABASE_URL=${DATABASE_URL} \
+  -e DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@decentra-postgres:5432/${POSTGRES_DB} \
   --link decentra-postgres \
   decentra-server
 ```
