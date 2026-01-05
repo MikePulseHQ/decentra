@@ -617,17 +617,32 @@
                 
             case 'voice_state_update':
                 if (voiceChat) {
-                    // Initialize screen sharing state for all voice members BEFORE handling voice state,
+                    // Initialize state for all voice members BEFORE handling voice state,
                     // so that any peer connections or incoming tracks can use the correct state.
                     if (voiceChat.remoteScreenSharing && typeof voiceChat.remoteScreenSharing.clear === 'function') {
                         voiceChat.remoteScreenSharing.clear();
+                    }
+                    if (voiceChat.remoteVideoEnabled && typeof voiceChat.remoteVideoEnabled.clear === 'function') {
+                        voiceChat.remoteVideoEnabled.clear();
+                    }
+                    if (voiceChat.remoteShowingScreen && typeof voiceChat.remoteShowingScreen.clear === 'function') {
+                        voiceChat.remoteShowingScreen.clear();
                     }
                     if (data.voice_members) {
                         data.voice_members.forEach(member => {
                             const memberUsername = typeof member === 'object' ? member.username : member;
                             const isScreenSharing = typeof member === 'object' ? member.screen_sharing : false;
+                            const hasVideo = typeof member === 'object' ? member.video : false;
+                            const showingScreen = typeof member === 'object' ? member.showing_screen : false;
+                            
                             if (voiceChat.remoteScreenSharing && typeof voiceChat.remoteScreenSharing.set === 'function') {
                                 voiceChat.remoteScreenSharing.set(memberUsername, isScreenSharing);
+                            }
+                            if (voiceChat.remoteVideoEnabled && typeof voiceChat.remoteVideoEnabled.set === 'function') {
+                                voiceChat.remoteVideoEnabled.set(memberUsername, hasVideo);
+                            }
+                            if (voiceChat.remoteShowingScreen && typeof voiceChat.remoteShowingScreen.set === 'function') {
+                                voiceChat.remoteShowingScreen.set(memberUsername, showingScreen);
                             }
                         });
                     }
@@ -690,8 +705,15 @@
                             // Track in voiceChat for toggle functionality
                             if (voiceChat) {
                                 voiceChat.remoteVideoEnabled.set(data.username, data.video);
-                                // Clean up state if both video and screenshare are disabled
-                                if (!data.video) {
+                                // Initialize remoteShowingScreen if video is enabled and screenshare is also active
+                                if (data.video) {
+                                    const hasScreenShare = voiceChat.remoteScreenSharing.get(data.username) || false;
+                                    if (hasScreenShare) {
+                                        // Both video and screenshare are active, set to show screen by default
+                                        voiceChat.remoteShowingScreen.set(data.username, true);
+                                    }
+                                } else {
+                                    // Clean up state if both video and screenshare are disabled
                                     const hasScreenShare = voiceChat.remoteScreenSharing.get(data.username) || false;
                                     if (!hasScreenShare) {
                                         voiceChat.remoteShowingScreen.delete(data.username);

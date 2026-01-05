@@ -1398,7 +1398,8 @@ async def handler(websocket):
                                     'server_id': server_id,
                                     'muted': False,
                                     'video': False,
-                                    'screen_sharing': False
+                                    'screen_sharing': False,
+                                    'showing_screen': False
                                 }
                                 
                                 # Get current voice members with state details
@@ -1411,7 +1412,8 @@ async def handler(websocket):
                                         **member_avatar,
                                         'muted': member_state.get('muted', False),
                                         'video': member_state.get('video', False),
-                                        'screen_sharing': member_state.get('screen_sharing', False)
+                                        'screen_sharing': member_state.get('screen_sharing', False),
+                                        'showing_screen': member_state.get('showing_screen', False)
                                     })
                                 
                                 # Notify all server members about voice state change
@@ -1448,7 +1450,8 @@ async def handler(websocket):
                                             **member_avatar,
                                             'muted': member_state.get('muted', False),
                                             'video': member_state.get('video', False),
-                                            'screen_sharing': member_state.get('screen_sharing', False)
+                                            'screen_sharing': member_state.get('screen_sharing', False),
+                                            'showing_screen': member_state.get('showing_screen', False)
                                         })
                                     
                                     # Notify all server members
@@ -1823,7 +1826,8 @@ async def handler(websocket):
                                 **member_avatar,
                                 'muted': member_state.get('muted', False),
                                 'video': member_state.get('video', False),
-                                'screen_sharing': member_state.get('screen_sharing', False)
+                                'screen_sharing': member_state.get('screen_sharing', False),
+                                'showing_screen': member_state.get('showing_screen', False)
                             })
                         
                         # Notify all server members

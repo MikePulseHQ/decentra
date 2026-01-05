@@ -21,7 +21,7 @@ class VoiceChat {
         this.remoteScreenSharing = new Map(); // Track which peers are screen sharing
         this.remoteVideoEnabled = new Map(); // Track which peers have video enabled
         this.remoteShowingScreen = new Map(); // Track which peers are currently showing screen (vs camera)
-        this.showingScreenShare = true; // Default/preferred source when both video and screenshare are active (true = screen, false = camera)
+        this.showingScreen = true; // Default/preferred source when both video and screenshare are active (true = screen, false = camera)
         
         // Video configuration constants
         this.VIDEO_WIDTH = 640;
@@ -422,7 +422,7 @@ class VoiceChat {
                 }
                 
                 // Update state - now showing screen
-                this.showingScreenShare = true;
+                this.showingScreen = true;
                 
                 // Notify server
                 this.ws.send(JSON.stringify({
@@ -474,7 +474,7 @@ class VoiceChat {
             this.isScreenSharing = false;
             
             // Update state
-            this.showingScreenShare = false;
+            this.showingScreen = false;
             
             // Restore camera preview if video is enabled, otherwise remove preview
             if (window.onLocalVideoTrack) {
@@ -531,7 +531,7 @@ class VoiceChat {
         this.isScreenSharing = false;
         
         // Update state
-        this.showingScreenShare = false;
+        this.showingScreen = false;
         
         // Restore camera preview if video is enabled, otherwise remove preview
         if (window.onLocalVideoTrack) {
@@ -588,7 +588,7 @@ class VoiceChat {
             return;
         }
         
-        this.showingScreenShare = showScreen;
+        this.showingScreen = showScreen;
         const newTrack = videoTracks[0];
         
         // Switch the track being sent to all peers
@@ -602,8 +602,15 @@ class VoiceChat {
             }
         });
         
-        // Wait for all track replacements to complete
-        await Promise.all(replacePromises);
+        // Wait for all track replacements to complete with error handling
+        try {
+            await Promise.all(replacePromises);
+        } catch (error) {
+            console.error('Error replacing video tracks:', error);
+            // Revert state on failure
+            this.showingScreen = !showScreen;
+            throw error;
+        }
         
         // Update local preview
         if (window.onLocalVideoTrack) {
