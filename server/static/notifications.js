@@ -369,6 +369,7 @@ class NotificationManager {
         }
         
         // Always play sound regardless of visibility (if sounds are enabled)
+        // Fire-and-forget: we don't await to avoid blocking the notification
         if (this.soundsEnabled) {
             this.playSound('message', this.messageSound);
         }
@@ -380,6 +381,7 @@ class NotificationManager {
             `${caller} is calling you...`
         );
         
+        // Fire-and-forget: we don't await to avoid blocking the notification
         if (this.soundsEnabled) {
             this.playSound('call', this.callSound);
         }
