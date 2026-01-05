@@ -482,8 +482,9 @@ class Database:
                     DELETE FROM email_verification_codes 
                     WHERE expires_at <= %s
                 ''', (datetime.now(),))
-        except Exception:
-            pass
+        except Exception as e:
+            # Log and suppress cleanup errors to avoid impacting callers
+            print(f"Error cleaning up expired verification codes: {e}")
     
     def get_first_user(self) -> Optional[str]:
         """Get the first user (admin) username."""
