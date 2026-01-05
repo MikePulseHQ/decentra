@@ -54,7 +54,7 @@ cp .env.example .env
 ```
 
 Then edit `.env` and update the database credentials (especially the password):
-```bash
+```env
 # PostgreSQL Database Configuration
 POSTGRES_DB=decentra
 POSTGRES_USER=decentra
@@ -102,12 +102,6 @@ cp .env.example .env
 
 2. First, start PostgreSQL:
 ```bash
-# You can either load environment variables into your shell:
-set -a
-source .env
-set +a
-
-# Or use the --env-file flag (recommended):
 docker run -d --name decentra-postgres \
   --env-file .env \
   -v decentra-data:/var/lib/postgresql/data \
@@ -116,14 +110,13 @@ docker run -d --name decentra-postgres \
 
 3. Then, build and run the server:
 ```bash
-cd server
-docker build -t decentra-server .
-
-# Load environment variables if not already loaded
+# Load environment variables for constructing DATABASE_URL
 set -a
-source ../.env
+source .env
 set +a
 
+cd server
+docker build -t decentra-server .
 docker run -p 8765:8765 \
   -e DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@decentra-postgres:5432/${POSTGRES_DB} \
   --link decentra-postgres \
