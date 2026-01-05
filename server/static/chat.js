@@ -690,6 +690,13 @@
                             // Track in voiceChat for toggle functionality
                             if (voiceChat) {
                                 voiceChat.remoteVideoEnabled.set(data.username, data.video);
+                                // Clean up state if both video and screenshare are disabled
+                                if (!data.video) {
+                                    const hasScreenShare = voiceChat.remoteScreenSharing.get(data.username) || false;
+                                    if (!hasScreenShare) {
+                                        voiceChat.remoteShowingScreen.delete(data.username);
+                                    }
+                                }
                                 // Update toggle button if both video and screenshare are active
                                 updateVideoToggleButton(data.username);
                             }
@@ -720,6 +727,9 @@
                                     const hasVideo = voiceChat.remoteVideoEnabled.get(data.username) || false;
                                     if (hasVideo) {
                                         voiceChat.remoteShowingScreen.set(data.username, false);
+                                    } else {
+                                        // Neither video nor screenshare active, remove from tracking
+                                        voiceChat.remoteShowingScreen.delete(data.username);
                                     }
                                 }
                                 // Update toggle button if both video and screenshare are active

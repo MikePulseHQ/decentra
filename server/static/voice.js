@@ -594,6 +594,8 @@ class VoiceChat {
                 // Verify the track exists before replacing
                 if (videoTracks.length > 0) {
                     videoSender.replaceTrack(videoTracks[0]);
+                } else {
+                    console.warn('No video tracks available for replacement from', showScreen ? 'screen stream' : 'video stream');
                 }
             }
         });
@@ -677,6 +679,11 @@ class VoiceChat {
         this.isMuted = false;
         this.isVideoEnabled = false;
         this.isScreenSharing = false;
+        
+        // Clear remote state tracking
+        this.remoteVideoEnabled.clear();
+        this.remoteScreenSharing.clear();
+        this.remoteShowingScreen.clear();
     }
     
     async startDirectCall(friendUsername) {
