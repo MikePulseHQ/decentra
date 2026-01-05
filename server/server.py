@@ -1673,16 +1673,33 @@ async def handler(websocket):
                                 }))
                     
                     elif data.get('type') == 'switch_video_source':
-                        # Forward request to switch video source to the target user
+                        # Forward request to switch video source to the target user,
+                        # but only if both users are in the same voice channel
                         target_user = data.get('target')
                         show_screen = data.get('show_screen', True)
                         
                         if target_user:
-                            await send_to_user(target_user, json.dumps({
-                                'type': 'switch_video_source_request',
-                                'from': username,
-                                'show_screen': show_screen
-                            }))
+                            requester_state = voice_states.get(username)
+                            target_state = voice_states.get(target_user)
+
+                            # Ensure both users are in a voice channel and in the same one
+                            if (
+                                requester_state
+                                and target_state
+                                and requester_state.get('server_id') == target_state.get('server_id')
+                                and requester_state.get('channel_id') == target_state.get('channel_id')
+                            ):
+                                await send_to_user(target_user, json.dumps({
+                                    'type': 'switch_video_source_request',
+                                    'from': username,
+                                    'show_screen': show_screen
+                                }))
+                            else:
+                                # Reject unauthorized switch requests
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': 'Cannot request video source switch: target user is not in the same voice channel'
+                                }))
                     
                     elif data.get('type') == 'video_source_changed':
                         # Broadcast to others in voice channel that video source has changed
