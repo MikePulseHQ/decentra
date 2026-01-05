@@ -100,15 +100,16 @@ cp .env.example .env
 # Edit .env with your credentials
 ```
 
-2. First, start PostgreSQL (using your .env values):
+2. First, start PostgreSQL:
 ```bash
-# Load environment variables
-export $(cat .env | grep -v '^#' | xargs)
+# You can either load environment variables into your shell:
+set -a
+source .env
+set +a
 
+# Or use the --env-file flag (recommended):
 docker run -d --name decentra-postgres \
-  -e POSTGRES_DB=${POSTGRES_DB} \
-  -e POSTGRES_USER=${POSTGRES_USER} \
-  -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
+  --env-file .env \
   -v decentra-data:/var/lib/postgresql/data \
   postgres:16-alpine
 ```
@@ -117,6 +118,12 @@ docker run -d --name decentra-postgres \
 ```bash
 cd server
 docker build -t decentra-server .
+
+# Load environment variables if not already loaded
+set -a
+source ../.env
+set +a
+
 docker run -p 8765:8765 \
   -e DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@decentra-postgres:5432/${POSTGRES_DB} \
   --link decentra-postgres \
