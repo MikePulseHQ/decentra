@@ -12,6 +12,7 @@ import time
 from datetime import datetime
 from contextlib import contextmanager
 from typing import List, Dict, Set, Optional, Tuple
+from encryption_utils import get_encryption_manager
 
 
 class Database:
@@ -395,7 +396,7 @@ class Database:
     
     # Admin settings operations
     def get_admin_settings(self) -> Dict:
-        """Get admin settings from database."""
+        """Get admin settings from database with decrypted SMTP password."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('SELECT * FROM admin_settings WHERE id = 1')
@@ -406,11 +407,17 @@ class Database:
                 settings.pop('id', None)
                 settings.pop('created_at', None)
                 settings.pop('updated_at', None)
+                
+                # Decrypt SMTP password if present
+                if settings.get('smtp_password'):
+                    encryption_manager = get_encryption_manager()
+                    settings['smtp_password'] = encryption_manager.decrypt(settings['smtp_password'])
+                
                 return settings
             return {}
     
     def update_admin_settings(self, settings: Dict) -> bool:
-        """Update admin settings in database."""
+        """Update admin settings in database with encrypted SMTP password."""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -420,6 +427,11 @@ class Database:
                 values = []
                 for key, value in settings.items():
                     if key not in ['id', 'created_at', 'updated_at']:
+                        # Encrypt SMTP password before storing
+                        if key == 'smtp_password' and value:
+                            encryption_manager = get_encryption_manager()
+                            value = encryption_manager.encrypt(value)
+                        
                         set_clauses.append(f"{key} = %s")
                         values.append(value)
                 

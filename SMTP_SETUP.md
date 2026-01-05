@@ -105,11 +105,40 @@ After entering your SMTP settings:
 
 ## Security Considerations
 
-1. **Never share your SMTP credentials**: Keep your admin password and SMTP credentials secure
-2. **Use app-specific passwords**: When available (like Gmail), use app-specific passwords instead of your main password
-3. **Enable TLS**: Always use TLS/SSL encryption when connecting to SMTP servers
-4. **Restrict admin access**: Only the first user can access SMTP settings
-5. **Test regularly**: Periodically test your SMTP connection to ensure it's still working
+1. **Password Encryption**: SMTP passwords are encrypted at rest in the database using Fernet symmetric encryption
+   - Encryption keys are derived from the `DECENTRA_ENCRYPTION_KEY` environment variable
+   - For production deployments, set a strong `DECENTRA_ENCRYPTION_KEY` environment variable
+   - If not set, a default key is used (less secure, but ensures functionality)
+2. **Never share your SMTP credentials**: Keep your admin password and SMTP credentials secure
+3. **Use app-specific passwords**: When available (like Gmail), use app-specific passwords instead of your main password
+4. **Enable TLS**: Always use TLS/SSL encryption when connecting to SMTP servers
+5. **Restrict admin access**: Only the first user can access SMTP settings
+6. **Test regularly**: Periodically test your SMTP connection to ensure it's still working
+
+### Setting Encryption Key for Production
+
+For enhanced security in production environments, set the `DECENTRA_ENCRYPTION_KEY` environment variable:
+
+**Docker Compose:**
+```yaml
+services:
+  server:
+    environment:
+      - DECENTRA_ENCRYPTION_KEY=your-strong-random-passphrase-here
+```
+
+**Docker Run:**
+```bash
+docker run -e DECENTRA_ENCRYPTION_KEY=your-strong-random-passphrase-here ...
+```
+
+**Local Development:**
+```bash
+export DECENTRA_ENCRYPTION_KEY=your-strong-random-passphrase-here
+python server.py
+```
+
+**Important:** Keep your encryption key secure and consistent across deployments. If you change the key, existing encrypted passwords will not be decryptable.
 
 ## Troubleshooting
 

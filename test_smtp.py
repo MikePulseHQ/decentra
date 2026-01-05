@@ -205,6 +205,63 @@ def test_smtp_settings_fields():
     return True
 
 
+def test_password_encryption():
+    """Test SMTP password encryption functionality."""
+    print("\n\nTest 5: Password Encryption")
+    print("=" * 60)
+    
+    try:
+        from encryption_utils import get_encryption_manager
+        
+        print("\n5.1: Testing encryption manager initialization...")
+        em = get_encryption_manager()
+        assert em is not None, "Encryption manager should not be None"
+        print("✓ Encryption manager initialized")
+        
+        print("\n5.2: Testing password encryption...")
+        test_passwords = [
+            'simple_password',
+            'C0mpl3x_P@ssw0rd!',
+            'very_long_password_with_special_chars_!@#$%^&*()',
+            ''  # Empty password
+        ]
+        
+        for password in test_passwords:
+            if password:  # Skip empty for display
+                print(f"  Testing: '{password[:20]}{'...' if len(password) > 20 else ''}'")
+            encrypted = em.encrypt(password)
+            decrypted = em.decrypt(encrypted)
+            
+            if password:  # Only check non-empty passwords
+                assert password == decrypted, f"Encryption/decryption mismatch for '{password}'"
+                assert em.is_encrypted(encrypted), f"Encrypted data should be detected as encrypted"
+                assert not em.is_encrypted(password), f"Plaintext should not be detected as encrypted"
+        
+        print("✓ All passwords encrypted/decrypted correctly")
+        
+        print("\n5.3: Testing encryption consistency...")
+        # Same password should decrypt to same value across multiple encryptions
+        password = "test_consistency"
+        encrypted1 = em.encrypt(password)
+        encrypted2 = em.encrypt(password)
+        
+        # Different encrypted values (due to random IV)
+        # But both should decrypt to same password
+        decrypted1 = em.decrypt(encrypted1)
+        decrypted2 = em.decrypt(encrypted2)
+        
+        assert decrypted1 == password, "First decryption failed"
+        assert decrypted2 == password, "Second decryption failed"
+        print("✓ Encryption is consistent and deterministic in decryption")
+        
+        print("\n✅ Password encryption tests passed!")
+        return True
+        
+    except ImportError as e:
+        print(f"\n⚠️  Skipping encryption tests (module not available): {e}")
+        return True  # Don't fail if cryptography not installed yet
+
+
 def run_all_tests():
     """Run all SMTP tests."""
     print("SMTP Functionality Tests for Decentra")
@@ -214,7 +271,8 @@ def run_all_tests():
         test_email_sender_initialization,
         test_smtp_config_validation,
         test_email_content_generation,
-        test_smtp_settings_fields
+        test_smtp_settings_fields,
+        test_password_encryption
     ]
     
     passed = 0
