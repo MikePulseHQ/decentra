@@ -386,6 +386,16 @@ class Database:
                 return dict(row)
             return None
     
+    def get_user_by_email(self, email: str) -> Optional[Dict]:
+        """Get user data by email address."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM users WHERE email = %s', (email,))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            return None
+    
     def get_all_users(self) -> List[str]:
         """Get all usernames."""
         with self.get_connection() as conn:

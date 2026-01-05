@@ -328,6 +328,14 @@ async def handler(websocket):
                     }))
                     continue
                 
+                # Check if email is already registered
+                if db.get_user_by_email(email):
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'Email address already registered'
+                    }))
+                    continue
+                
                 # Check invite code requirement
                 all_users = db.get_all_users()
                 invite_data = db.get_invite_code(invite_code) if invite_code else None
@@ -363,6 +371,15 @@ async def handler(websocket):
                         db.delete_email_verification_code(email, username)
                         continue
                     
+                    # Check for race condition - prevent overwriting existing pending signup
+                    if username in pending_signups:
+                        await websocket.send_str(json.dumps({
+                            'type': 'auth_error',
+                            'message': 'A signup is already in progress for this username. Please wait or use a different username.'
+                        }))
+                        db.delete_email_verification_code(email, username)
+                        continue
+                    
                     # Store signup data temporarily for verification step
                     inviter_username = invite_data['creator'] if invite_data else None
                     pending_signups[username] = {
@@ -389,6 +406,14 @@ async def handler(websocket):
                 username = auth_data.get('username', '').strip()
                 code = auth_data.get('code', '').strip()
                 
+                # Validate verification code format (must be exactly 6 digits)
+                if not code or not code.isdigit() or len(code) != 6:
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'Invalid verification code format'
+                    }))
+                    continue
+                
                 # Check if we have pending signup data
                 if username not in pending_signups:
                     await websocket.send_str(json.dumps({
@@ -411,9 +436,13 @@ async def handler(websocket):
                 
                 # Create user account in database
                 if not db.create_user(username, pending['password_hash'], email, email_verified=True):
+                    # Clean up so the user can restart signup if account creation fails
+                    db.delete_email_verification_code(email, username)
+                    if username in pending_signups:
+                        del pending_signups[username]
                     await websocket.send_str(json.dumps({
                         'type': 'auth_error',
-                        'message': 'Failed to create account'
+                        'message': 'Failed to create account. Please restart signup.'
                     }))
                     continue
                 
@@ -2008,6 +2037,17 @@ async def websocket_handler(request):
     return ws
 
 
+async def cleanup_verification_codes_periodically():
+    """Periodic task to clean up expired verification codes."""
+    while True:
+        try:
+            await asyncio.sleep(3600)  # Run every hour
+            db.cleanup_expired_verification_codes()
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Cleaned up expired verification codes")
+        except Exception as e:
+            print(f"Error in periodic cleanup task: {e}")
+
+
 async def main():
     """Start the HTTP and WebSocket server."""
     print("Decentra Chat Server")
@@ -2034,6 +2074,9 @@ async def main():
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', 8765)
     await site.start()
+    
+    # Start periodic cleanup task
+    asyncio.create_task(cleanup_verification_codes_periodically())
     
     print("Server started successfully!")
     print("Access the web client at http://localhost:8765")
