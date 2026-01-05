@@ -733,6 +733,13 @@
                 }
                 break;
             
+            case 'video_source_changed_update':
+                // Update UI when a user switches their video source
+                if (data.username) {
+                    updateVideoSourceDisplay(data.username, data.showing_screen);
+                }
+                break;
+            
             case 'incoming_voice_call':
                 handleIncomingCall(data.from);
                 break;
@@ -3048,12 +3055,33 @@
                 // Toggle between screen and camera
                 const newShowScreen = !isShowingScreen;
                 voiceChat.switchVideoSource(username, newShowScreen);
-                // Update button immediately for responsiveness
-                toggleBtn.textContent = newShowScreen ? '📹 Show Camera' : '🖥️ Show Screen';
-                toggleBtn.title = newShowScreen ? 'Switch to camera view' : 'Switch to screen share';
             });
             
             videoContainer.appendChild(toggleBtn);
+        }
+    }
+    
+    // Update video source display when user switches between camera and screen
+    function updateVideoSourceDisplay(username, showingScreen) {
+        const videoContainer = document.getElementById(`video-${username}`);
+        if (!videoContainer) return;
+        
+        const label = videoContainer.querySelector('.video-label');
+        
+        // Update container class and label based on what's being shown
+        if (showingScreen) {
+            videoContainer.classList.add('screen-share');
+            if (label) label.textContent = `${username} (Screen)`;
+        } else {
+            videoContainer.classList.remove('screen-share');
+            if (label) label.textContent = username;
+        }
+        
+        // Update toggle button text
+        const toggleBtn = videoContainer.querySelector('.toggle-video-btn');
+        if (toggleBtn) {
+            toggleBtn.textContent = showingScreen ? '📹 Show Camera' : '🖥️ Show Screen';
+            toggleBtn.title = showingScreen ? 'Switch to camera view' : 'Switch to screen share';
         }
     }
     

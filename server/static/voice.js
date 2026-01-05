@@ -420,11 +420,22 @@ class VoiceChat {
                     window.onLocalVideoTrack(this.localScreenStream, true);
                 }
                 
+                // Update state - now showing screen
+                this.showingScreenShare = true;
+                
                 // Notify server
                 this.ws.send(JSON.stringify({
                     type: 'voice_screen_share',
                     screen_sharing: true
                 }));
+                
+                // If video is also enabled, notify that we're now showing screen
+                if (this.isVideoEnabled) {
+                    this.ws.send(JSON.stringify({
+                        type: 'video_source_changed',
+                        showing_screen: true
+                    }));
+                }
                 
                 return true;
             } catch (error) {
@@ -461,6 +472,9 @@ class VoiceChat {
             
             this.isScreenSharing = false;
             
+            // Update state
+            this.showingScreenShare = false;
+            
             // Restore camera preview if video is enabled, otherwise remove preview
             if (window.onLocalVideoTrack) {
                 if (this.isVideoEnabled && this.localVideoStream) {
@@ -475,6 +489,14 @@ class VoiceChat {
                 type: 'voice_screen_share',
                 screen_sharing: false
             }));
+            
+            // If video is still enabled, notify that we're now showing camera
+            if (this.isVideoEnabled) {
+                this.ws.send(JSON.stringify({
+                    type: 'video_source_changed',
+                    showing_screen: false
+                }));
+            }
             
             return false;
         }
@@ -507,6 +529,9 @@ class VoiceChat {
         
         this.isScreenSharing = false;
         
+        // Update state
+        this.showingScreenShare = false;
+        
         // Restore camera preview if video is enabled, otherwise remove preview
         if (window.onLocalVideoTrack) {
             if (this.isVideoEnabled && this.localVideoStream) {
@@ -521,6 +546,14 @@ class VoiceChat {
             type: 'voice_screen_share',
             screen_sharing: false
         }));
+        
+        // If video is still enabled, notify that we're now showing camera
+        if (this.isVideoEnabled) {
+            this.ws.send(JSON.stringify({
+                type: 'video_source_changed',
+                showing_screen: false
+            }));
+        }
     }
     
     // Switch between showing camera or screen when both are active
@@ -563,6 +596,12 @@ class VoiceChat {
                 window.onLocalVideoTrack(this.localVideoStream, false);
             }
         }
+        
+        // Notify server about the current video source being sent
+        this.ws.send(JSON.stringify({
+            type: 'video_source_changed',
+            showing_screen: showScreen
+        }));
     }
     
     async joinVoiceChannel(serverId, channelId) {

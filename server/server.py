@@ -1684,6 +1684,21 @@ async def handler(websocket):
                                 'show_screen': show_screen
                             }))
                     
+                    elif data.get('type') == 'video_source_changed':
+                        # Broadcast to others in voice channel that video source has changed
+                        if username in voice_states:
+                            showing_screen = data.get('showing_screen', True)
+                            voice_states[username]['showing_screen'] = showing_screen
+                            state = voice_states[username]
+                            
+                            # Notify others in the same voice channel
+                            if state.get('server_id') and state.get('channel_id'):
+                                await broadcast_to_server(state['server_id'], json.dumps({
+                                    'type': 'video_source_changed_update',
+                                    'username': username,
+                                    'showing_screen': showing_screen
+                                }))
+                    
                     # WebRTC signaling
                     elif data.get('type') == 'webrtc_offer':
                         target_user = data.get('target')
