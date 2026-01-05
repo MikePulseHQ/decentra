@@ -4,6 +4,8 @@ Email utilities for Decentra Chat Server
 Provides SMTP email sending functionality
 """
 
+from __future__ import annotations
+
 import smtplib
 import ssl
 from email.mime.text import MIMEText

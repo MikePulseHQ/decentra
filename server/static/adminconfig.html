@@ -391,16 +391,16 @@
         document.getElementById('save-settings').addEventListener('click', () => {
             const settings = {
                 server_name: document.getElementById('server-name').value,
-                max_message_length: parseInt(document.getElementById('max-message-length').value),
+                max_message_length: parseInt(document.getElementById('max-message-length').value, 10),
                 allow_registration: document.getElementById('allow-registrations').checked,
                 require_invite: document.getElementById('require-invite').checked,
-                max_file_size_mb: parseInt(document.getElementById('max-file-size').value),
-                max_servers_per_user: parseInt(document.getElementById('max-servers-per-user').value),
-                max_channels_per_server: parseInt(document.getElementById('max-channels-per-server').value),
+                max_file_size_mb: parseInt(document.getElementById('max-file-size').value, 10),
+                max_servers_per_user: parseInt(document.getElementById('max-servers-per-user').value, 10),
+                max_channels_per_server: parseInt(document.getElementById('max-channels-per-server').value, 10),
                 // SMTP settings
                 smtp_enabled: document.getElementById('smtp-enabled').checked,
                 smtp_host: document.getElementById('smtp-host').value,
-                smtp_port: parseInt(document.getElementById('smtp-port').value),
+                smtp_port: parseInt(document.getElementById('smtp-port').value, 10),
                 smtp_username: document.getElementById('smtp-username').value,
                 smtp_password: document.getElementById('smtp-password').value,
                 smtp_from_email: document.getElementById('smtp-from-email').value,
@@ -418,7 +418,7 @@
             const smtpSettings = {
                 smtp_enabled: document.getElementById('smtp-enabled').checked,
                 smtp_host: document.getElementById('smtp-host').value,
-                smtp_port: parseInt(document.getElementById('smtp-port').value),
+                smtp_port: parseInt(document.getElementById('smtp-port').value, 10),
                 smtp_username: document.getElementById('smtp-username').value,
                 smtp_password: document.getElementById('smtp-password').value,
                 smtp_from_email: document.getElementById('smtp-from-email').value,
@@ -436,7 +436,7 @@
                     showSmtpTestResult(false, 'From Email Address is required when email notifications are enabled');
                     return;
                 }
-                if (!smtpSettings.smtp_port || smtpSettings.smtp_port < 1 || smtpSettings.smtp_port > 65535) {
+                if (isNaN(smtpSettings.smtp_port) || smtpSettings.smtp_port < 1 || smtpSettings.smtp_port > 65535) {
                     showSmtpTestResult(false, 'Valid SMTP Port (1-65535) is required');
                     return;
                 }
