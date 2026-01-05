@@ -74,7 +74,7 @@ def verify_password(password, password_hash):
 
 def is_valid_email(email):
     """Validate email address format using regex."""
-    # RFC 5322 compliant email regex (simplified version)
+    # Basic email format check (restrictive subset of RFC 5322; does not support all valid addresses)
     email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return re.match(email_pattern, email) is not None
 
