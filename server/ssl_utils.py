@@ -4,6 +4,7 @@ SSL/TLS utilities for generating self-signed certificates.
 
 import os
 import ssl
+import ipaddress
 from datetime import datetime, timedelta
 from cryptography import x509
 from cryptography.x509.oid import NameOID
@@ -82,7 +83,7 @@ def generate_self_signed_cert(cert_dir='certs', cert_file='cert.pem', key_file='
         x509.SubjectAlternativeName([
             x509.DNSName(u"localhost"),
             x509.DNSName(u"127.0.0.1"),
-            x509.IPAddress(b"\x7f\x00\x00\x01"),  # 127.0.0.1
+            x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")),
         ]),
         critical=False,
     ).sign(private_key, hashes.SHA256())
