@@ -906,7 +906,7 @@ class VoiceChat {
             }));
             console.log(`Answer sent to ${fromUsername}`);
         } catch (error) {
-            console.error(`Error handling offer from ${fromUsername}:`, error);
+            console.error('Error handling offer from %s:', fromUsername, error);
             alert(`Failed to process call from ${fromUsername}: ${error.message}`);
         }
     }
