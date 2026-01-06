@@ -24,6 +24,12 @@ A decentralized Discord-like chat server and client that is non-federated and se
 - 🔐 Username/password authentication
 - 🎟️ Invite code system for controlled access
 - 📜 Complete message history with database persistence
+- 🔔 **Browser Notifications** - Desktop notification popups
+  - Real-time notification popups for new messages
+  - Incoming voice call notifications
+  - Customizable notification sounds
+  - Notification modes: all messages, mentions only, or disabled
+  - Automatic permission requests on first use
 - 📧 **Email Notifications** - SMTP support for system emails
   - Configurable SMTP settings in admin panel
   - Welcome emails for new users
@@ -363,6 +369,71 @@ For detailed SMTP setup instructions and provider-specific examples, see [SMTP_S
 - **Mailgun**: smtp.mailgun.org:587
 
 See [SMTP_SETUP.md](SMTP_SETUP.md) for complete configuration details.
+
+## Browser Notifications
+
+Decentra includes built-in browser notification support to keep you informed of new messages and incoming calls, even when the app is in the background.
+
+### Features
+
+- **Desktop Notification Popups**: Get native browser notifications for new messages and incoming voice calls
+- **Customizable Sound Alerts**: Choose from multiple notification sounds for messages and calls
+- **Notification Modes**: Control when you receive notifications
+  - **All Messages**: Get notified for every new message
+  - **Mentions Only**: Only receive notifications when someone @mentions you
+  - **None**: Disable all notifications
+- **Intelligent Visibility Detection**: Notifications are only shown when the chat window is not actively visible
+
+### Setting up Browser Notifications
+
+1. **Initial Permission Request**: When you first log in, Decentra will request permission to show notifications. Click "Allow" to enable notifications.
+
+2. **Access Notification Settings**:
+   - Click the **⚙ menu button** in the bottom left
+   - Select **Notification Settings**
+
+3. **Configure Your Preferences**:
+   - **Enable Browser Notifications**: Toggle to enable/disable notification popups
+   - **Enable Notification Sounds**: Toggle to enable/disable sound alerts
+   - **Notification Mode**: Choose when to receive notifications (All, Mentions Only, or None)
+   - **Message Sound**: Select from "Soft Ping", "Gentle Chime", or "Subtle Pop"
+   - **Call Sound**: Select from "Classic Ring", "Modern Tone", or "Upbeat Call"
+
+4. **Test Your Settings**: Use the test buttons next to each sound option to preview notification sounds
+
+### How Notifications Work
+
+- **New Messages**: When you receive a message while the chat window is in the background or another tab, you'll see a desktop notification with the sender's name and message preview
+- **Incoming Calls**: When someone calls you, you'll receive a notification popup and hear your selected call sound
+- **Mentions**: When someone @mentions your username in a message, it's treated as a priority notification (respects your notification mode setting)
+- **Auto-Close**: Notification popups automatically close after 5 seconds
+- **Click to Focus**: Clicking a notification brings the chat window into focus
+
+### Browser Compatibility
+
+Browser notifications are supported in:
+- Chrome/Edge 22+
+- Firefox 22+
+- Safari 7+
+- Opera 25+
+
+**Note**: Notifications require HTTPS or localhost. The app uses a self-signed SSL certificate for local development, which ensures notifications work properly.
+
+### Troubleshooting
+
+If notifications aren't working:
+
+1. **Check Browser Permissions**: Make sure you've allowed notifications for the site
+   - Chrome: Click the lock icon in the address bar → Site Settings → Notifications
+   - Firefox: Click the lock icon → Permissions → Receive Notifications
+   - Safari: Safari menu → Preferences → Websites → Notifications
+
+2. **Check Notification Settings**: Ensure "Enable Browser Notifications" is toggled on in the app settings
+
+3. **System Notifications**: Make sure system-level notifications aren't disabled
+   - Windows: Settings → System → Notifications
+   - macOS: System Preferences → Notifications
+   - Linux: Varies by desktop environment
 
 ## Customization
 
