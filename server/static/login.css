@@ -25,13 +25,14 @@ body {
 
 .auth-box {
     background: rgba(54, 57, 63, 0.35);
-    border-radius: 5px;
+    border-radius: 16px;
     padding: 32px;
     box-shadow: 0 8px 24px 0 rgba(0, 0, 0, 0.3);
     width: 100%;
     backdrop-filter: blur(10px);
     position: relative;
     overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .auth-box::before {
@@ -96,16 +97,18 @@ body {
     width: 100%;
     padding: 10px;
     border: 1px solid rgba(0, 0, 0, 0.35);
-    border-radius: 3px;
+    border-radius: 8px;
     font-size: 16px;
     background-color: rgba(0, 0, 0, 0.35);
     color: #dcddde;
-    transition: border-color 0.15s ease;
+    transition: all 0.3s ease;
 }
 
 .form-group input:focus {
     outline: none;
     border-color: #5865F2;
+    box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.1);
+    transform: translateY(-1px);
 }
 
 .help-text {
@@ -121,18 +124,21 @@ button {
     background: #167DFF;
     color: white;
     border: none;
-    border-radius: 3px;
+    border-radius: 8px;
     font-size: 16px;
     font-weight: 500;
     cursor: pointer;
     margin-bottom: 8px;
-    transition: background-color 0.17s ease;
+    transition: all 0.3s ease;
     position: relative;
     z-index: 1;
+    transform: translateY(0);
 }
 
 button:hover {
     background: #1266CC;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(22, 125, 255, 0.3);
 }
 
 button:active {
@@ -145,6 +151,7 @@ button:active {
 
 .btn-secondary:hover {
     background: rgba(22, 125, 255, 0.2) !important;
+    transform: translateY(-1px);
 }
 
 .btn-secondary:active {
@@ -175,12 +182,24 @@ button:active {
     border: 1px solid #f04747;
     color: #f04747;
     padding: 10px;
-    border-radius: 3px;
+    border-radius: 8px;
     margin-bottom: 20px;
     font-size: 14px;
     text-align: center;
     position: relative;
     z-index: 1;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 .success {
@@ -188,10 +207,11 @@ button:active {
     border: 1px solid #43b581;
     color: #43b581;
     padding: 10px;
-    border-radius: 3px;
+    border-radius: 8px;
     margin-bottom: 20px;
     font-size: 14px;
     text-align: center;
     position: relative;
     z-index: 1;
+    animation: slideIn 0.3s ease;
 }
