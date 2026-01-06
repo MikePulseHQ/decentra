@@ -1283,7 +1283,7 @@ body::before {
     font-weight: 500;
     color: #b9bbbe;
     border-bottom: 2px solid transparent;
-    transition: all 0.15s ease;
+    transition: all 0.3s ease;
     margin-bottom: -2px;
 }
 
@@ -2131,7 +2131,7 @@ body::before {
     font-weight: 500;
     color: #b9bbbe;
     border-bottom: 2px solid transparent;
-    transition: all 0.15s ease;
+    transition: all 0.3s ease;
     margin-bottom: -2px;
 }
 
