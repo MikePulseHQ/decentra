@@ -6,7 +6,7 @@ Test script to verify SSL certificate generation works correctly.
 import os
 import sys
 import ssl
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Add server directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'server'))
@@ -49,7 +49,9 @@ def test_ssl_certificate_generation():
     print(f"  Serial number: {cert.serial_number}")
     
     # Verify certificate is still valid
-    assert cert.not_valid_after > datetime.now(), "Certificate has expired"
+    # X.509 certificates store times as timezone-naive UTC, so compare with UTC time
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    assert cert.not_valid_after > now_utc, "Certificate has expired"
     print(f"✓ Certificate is valid")
     
     # Create SSL context

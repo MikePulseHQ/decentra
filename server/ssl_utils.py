@@ -5,7 +5,7 @@ SSL/TLS utilities for generating self-signed certificates.
 import os
 import ssl
 import ipaddress
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes
@@ -38,7 +38,10 @@ def generate_self_signed_cert(cert_dir='certs', cert_file='cert.pem', key_file='
             with open(cert_path, 'rb') as f:
                 cert = x509.load_pem_x509_certificate(f.read())
                 # Check if certificate is still valid (not expired)
-                if cert.not_valid_after > datetime.now():
+                # X.509 certificates store times as timezone-naive UTC
+                # Compare with current UTC time (also timezone-naive for compatibility)
+                now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+                if cert.not_valid_after > now_utc:
                     print(f"Using existing SSL certificate from {cert_path}")
                     print(f"Certificate valid until: {cert.not_valid_after}")
                     return cert_path, key_path
@@ -65,7 +68,8 @@ def generate_self_signed_cert(cert_dir='certs', cert_file='cert.pem', key_file='
         x509.NameAttribute(NameOID.COMMON_NAME, u"localhost"),
     ])
     
-    # Build certificate
+    # Build certificate with timezone-aware datetime (converted to UTC for storage)
+    now_utc = datetime.now(timezone.utc)
     cert = x509.CertificateBuilder().subject_name(
         subject
     ).issuer_name(
@@ -75,10 +79,10 @@ def generate_self_signed_cert(cert_dir='certs', cert_file='cert.pem', key_file='
     ).serial_number(
         x509.random_serial_number()
     ).not_valid_before(
-        datetime.now()
+        now_utc
     ).not_valid_after(
         # Certificate valid for 1 year
-        datetime.now() + timedelta(days=365)
+        now_utc + timedelta(days=365)
     ).add_extension(
         x509.SubjectAlternativeName([
             x509.DNSName(u"localhost"),
