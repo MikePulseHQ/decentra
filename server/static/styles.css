@@ -1414,7 +1414,7 @@ body::before {
 }
 
 .video-container:hover {
-    transform: scale(1.03);
+    transform: scale(1.02);
     box-shadow: 0 8px 24px rgba(88, 101, 242, 0.3);
 }
 
