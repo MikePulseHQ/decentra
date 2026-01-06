@@ -1044,6 +1044,36 @@ async def handler(websocket):
                         else:
                             settings = data.get('settings', {})
                             
+                            # Server-side validation for announcement settings
+                            if settings.get('announcement_enabled'):
+                                # Validate message length
+                                message = settings.get('announcement_message', '')
+                                if len(message) > 500:
+                                    await websocket.send_str(json.dumps({
+                                        'type': 'error',
+                                        'message': 'Announcement message cannot exceed 500 characters'
+                                    }))
+                                    continue
+                                
+                                # Validate duration
+                                duration = settings.get('announcement_duration_minutes')
+                                if duration is None or not isinstance(duration, (int, float)):
+                                    await websocket.send_str(json.dumps({
+                                        'type': 'error',
+                                        'message': 'Invalid announcement duration value'
+                                    }))
+                                    continue
+                                
+                                duration = int(duration)
+                                if duration < 1 or duration > 10080:
+                                    await websocket.send_str(json.dumps({
+                                        'type': 'error',
+                                        'message': 'Announcement duration must be between 1 and 10080 minutes'
+                                    }))
+                                    continue
+                                
+                                settings['announcement_duration_minutes'] = duration
+                            
                             # If announcement is enabled and message is set, update timestamp
                             if settings.get('announcement_enabled') and settings.get('announcement_message'):
                                 # Get current settings to check if announcement changed

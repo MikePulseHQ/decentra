@@ -455,7 +455,7 @@
             settings.announcement_enabled = document.getElementById('announcement-enabled').checked;
             settings.announcement_message = document.getElementById('announcement-message').value;
             
-            // Validate announcement duration
+            // Validate announcement duration (always, not just when enabled)
             if (settings.announcement_duration_minutes < 1) {
                 showStatus('Announcement duration must be at least 1 minute', 'error');
                 return;

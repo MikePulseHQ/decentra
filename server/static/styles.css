@@ -2121,8 +2121,13 @@ body::before {
     font-weight: 500;
 }
 
+.announcement-icon {
+    font-size: 18px;
+    margin-right: 8px;
+}
+
 #announcement-text {
-    margin-left: 10px;
+    margin-left: 0;
 }
 
 .announcement-close {
