@@ -921,7 +921,7 @@ class VoiceChat {
                 await pc.setRemoteDescription(new RTCSessionDescription(answer));
                 console.log(`Answer processed for ${fromUsername}`);
             } catch (error) {
-                console.error(`Error handling answer from ${fromUsername}:`, error);
+                console.error('Error handling answer from %s:', fromUsername, error);
                 alert(`Failed to complete connection with ${fromUsername}: ${error.message}`);
             }
         } else {
