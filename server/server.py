@@ -606,12 +606,13 @@ async def handler(websocket):
         
         # Send announcement data
         admin_settings = db.get_admin_settings()
+        set_at = admin_settings.get('announcement_set_at')
         announcement_data = {
             'type': 'announcement_update',
             'enabled': admin_settings.get('announcement_enabled', False),
             'message': admin_settings.get('announcement_message', ''),
             'duration_minutes': admin_settings.get('announcement_duration_minutes', 60),
-            'set_at': admin_settings.get('announcement_set_at').isoformat() if admin_settings.get('announcement_set_at') else None
+            'set_at': set_at.isoformat() if set_at and hasattr(set_at, 'isoformat') else None
         }
         await websocket.send_str(json.dumps(announcement_data))
         
@@ -1062,12 +1063,13 @@ async def handler(websocket):
                                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Admin {username} updated settings: {settings}")
                                 
                                 # Broadcast announcement update to all connected clients
+                                set_at = settings.get('announcement_set_at')
                                 announcement_data = {
                                     'type': 'announcement_update',
                                     'enabled': settings.get('announcement_enabled', False),
                                     'message': settings.get('announcement_message', ''),
                                     'duration_minutes': settings.get('announcement_duration_minutes', 60),
-                                    'set_at': settings.get('announcement_set_at').isoformat() if settings.get('announcement_set_at') else None
+                                    'set_at': set_at.isoformat() if set_at and hasattr(set_at, 'isoformat') else None
                                 }
                                 
                                 for client_ws in active_connections.values():

@@ -3475,7 +3475,16 @@
     const ANNOUNCEMENT_DISMISSED_KEY = 'announcement_dismissed';
     let currentAnnouncementData = null; // Store current announcement data
     
+    // Only set up announcement handling if elements exist
+    if (!announcementBanner || !announcementText || !closeAnnouncementBtn) {
+        console.warn('Announcement banner elements not found in DOM');
+    }
+    
     function handleAnnouncementUpdate(data) {
+        if (!announcementBanner || !announcementText) {
+            return; // Elements not available
+        }
+        
         currentAnnouncementData = data; // Store for later use when dismissing
         
         if (!data.enabled || !data.message) {
@@ -3517,26 +3526,29 @@
     }
     
     function hideAnnouncement() {
+        if (!announcementBanner) return;
         announcementBanner.classList.add('hidden');
         document.body.classList.remove('announcement-visible');
     }
     
-    closeAnnouncementBtn.addEventListener('click', () => {
-        if (!currentAnnouncementData) return;
+    if (closeAnnouncementBtn) {
+        closeAnnouncementBtn.addEventListener('click', () => {
+            if (!currentAnnouncementData) return;
+            
+            // Store dismissal in localStorage
+            try {
+                localStorage.setItem(ANNOUNCEMENT_DISMISSED_KEY, JSON.stringify({
+                    message: currentAnnouncementData.message,
+                    set_at: currentAnnouncementData.set_at,
+                    dismissed_at: new Date().toISOString()
+                }));
+            } catch (e) {
+                console.error('Failed to store announcement dismissal:', e);
+            }
         
-        // Store dismissal in localStorage
-        try {
-            localStorage.setItem(ANNOUNCEMENT_DISMISSED_KEY, JSON.stringify({
-                message: currentAnnouncementData.message,
-                set_at: currentAnnouncementData.set_at,
-                dismissed_at: new Date().toISOString()
-            }));
-        } catch (e) {
-            console.error('Failed to store announcement dismissal:', e);
-        }
-        
-        hideAnnouncement();
-    });
+            hideAnnouncement();
+        });
+    }
     
     
     console.log('chat.js: About to call connect()');
