@@ -86,7 +86,6 @@ def generate_self_signed_cert(cert_dir='certs', cert_file='cert.pem', key_file='
     ).add_extension(
         x509.SubjectAlternativeName([
             x509.DNSName(u"localhost"),
-            x509.DNSName(u"127.0.0.1"),
             x509.IPAddress(ipaddress.IPv4Address("127.0.0.1")),
         ]),
         critical=False,
