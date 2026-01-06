@@ -3510,7 +3510,12 @@
             try {
                 const dismissed = JSON.parse(dismissedData);
                 // Check if this is the same announcement that was dismissed
-                if (dismissed.message === data.message && dismissed.set_at === data.set_at) {
+                // Handle both null and defined set_at values
+                const isSameMessage = dismissed.message === data.message;
+                const isSameTimestamp = (dismissed.set_at === data.set_at) || 
+                                       (dismissed.set_at === null && data.set_at === null);
+                
+                if (isSameMessage && isSameTimestamp) {
                     hideAnnouncement();
                     return;
                 }

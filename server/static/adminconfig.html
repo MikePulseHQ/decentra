@@ -434,21 +434,34 @@
                 smtp_password: document.getElementById('smtp-password').value,
                 smtp_from_email: document.getElementById('smtp-from-email').value,
                 smtp_from_name: document.getElementById('smtp-from-name').value,
-                smtp_use_tls: document.getElementById('smtp-use-tls').checked,
-                // Announcement settings
-                announcement_enabled: document.getElementById('announcement-enabled').checked,
-                announcement_message: document.getElementById('announcement-message').value,
-                announcement_duration_minutes: parseInt(document.getElementById('announcement-duration').value, 10) || 60
+                smtp_use_tls: document.getElementById('smtp-use-tls').checked
             };
             
-            // Validate announcement duration
-            if (settings.announcement_enabled && settings.announcement_duration_minutes < 1) {
-                showStatus('Announcement duration must be at least 1 minute', 'error');
-                return;
+            // Parse and validate announcement duration
+            const durationInput = document.getElementById('announcement-duration').value;
+            const duration = parseInt(durationInput, 10);
+            
+            // Check if parsing failed
+            if (isNaN(duration)) {
+                settings.announcement_duration_minutes = 60; // Default value
+            } else {
+                settings.announcement_duration_minutes = duration;
             }
-            if (settings.announcement_enabled && settings.announcement_duration_minutes > 10080) {
-                showStatus('Announcement duration cannot exceed 7 days (10080 minutes)', 'error');
-                return;
+            
+            // Announcement settings
+            settings.announcement_enabled = document.getElementById('announcement-enabled').checked;
+            settings.announcement_message = document.getElementById('announcement-message').value;
+            
+            // Validate announcement duration if enabled
+            if (settings.announcement_enabled) {
+                if (settings.announcement_duration_minutes < 1) {
+                    showStatus('Announcement duration must be at least 1 minute', 'error');
+                    return;
+                }
+                if (settings.announcement_duration_minutes > 10080) {
+                    showStatus('Announcement duration cannot exceed 7 days (10080 minutes)', 'error');
+                    return;
+                }
             }
             
             ws.send(JSON.stringify({
