@@ -99,6 +99,8 @@ def generate_self_signed_cert(cert_dir='certs', cert_file='cert.pem', key_file='
             format=serialization.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=serialization.NoEncryption()
         ))
+    # Restrict private key file permissions to owner read/write only
+    os.chmod(key_path, 0o600)
     
     # Write certificate to file
     with open(cert_path, 'wb') as f:
