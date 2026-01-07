@@ -2896,10 +2896,9 @@
         
         // Load current profile data from user's data
         // These will be populated from the init message
-        if (window.currentUserProfile) {
-            statusMessageInput.value = window.currentUserProfile.status_message || '';
-            bioInput.value = window.currentUserProfile.bio || '';
-        }
+        // Always initialize fields to avoid stale values if currentUserProfile is missing
+        statusMessageInput.value = (window.currentUserProfile && window.currentUserProfile.status_message) || '';
+        bioInput.value = (window.currentUserProfile && window.currentUserProfile.bio) || '';
     });
     
     closeProfileModalBtn.addEventListener('click', () => {
