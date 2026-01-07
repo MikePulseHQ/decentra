@@ -17,6 +17,7 @@ from aiohttp import web
 import os
 import base64
 import hashlib
+import jwt
 from database import Database
 from api import setup_api_routes
 from email_utils import EmailSender
@@ -24,6 +25,13 @@ from ssl_utils import generate_self_signed_cert, create_ssl_context
 
 # Initialize database
 db = Database()
+
+# JWT Configuration
+# Generate a secure random secret key for JWT tokens
+# In production, this should be stored securely (environment variable or secrets manager)
+JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', secrets.token_urlsafe(32))
+JWT_ALGORITHM = 'HS256'
+JWT_EXPIRATION_HOURS = 24  # Token expires after 24 hours
 
 # Store pending signups temporarily (in-memory)
 # Format: {username: {password_hash, email, invite_code, inviter_username}}
@@ -71,6 +79,28 @@ def serialize_role(role):
 def verify_password(password, password_hash):
     """Verify a password against its hash."""
     return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
+
+
+def generate_jwt_token(username):
+    """Generate a JWT token for a user."""
+    payload = {
+        'username': username,
+        'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS),
+        'iat': datetime.utcnow()
+    }
+    token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    return token
+
+
+def verify_jwt_token(token):
+    """Verify a JWT token and return the username if valid."""
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        return payload.get('username')
+    except jwt.ExpiredSignatureError:
+        return None  # Token has expired
+    except jwt.InvalidTokenError:
+        return None  # Invalid token
 
 
 def is_valid_email(email):
@@ -419,9 +449,13 @@ async def handler(websocket):
                         if invite_code:
                             db.delete_invite_code(invite_code)
                     
+                    # Generate JWT token for the user
+                    token = generate_jwt_token(username)
+                    
                     await websocket.send_str(json.dumps({
                         'type': 'auth_success',
-                        'message': 'Account created successfully'
+                        'message': 'Account created successfully',
+                        'token': token
                     }))
                     authenticated = True
                     clients[websocket] = username
@@ -496,9 +530,13 @@ async def handler(websocket):
                     if pending['invite_code']:
                         db.delete_invite_code(pending['invite_code'])
                 
+                # Generate JWT token for the user
+                token = generate_jwt_token(username)
+                
                 await websocket.send_str(json.dumps({
                     'type': 'auth_success',
-                    'message': 'Account created successfully'
+                    'message': 'Account created successfully',
+                    'token': token
                 }))
                 authenticated = True
                 clients[websocket] = username
@@ -540,13 +578,55 @@ async def handler(websocket):
                     }))
                     continue
                 
+                # Generate JWT token for the user
+                token = generate_jwt_token(username)
+                
                 await websocket.send_str(json.dumps({
                     'type': 'auth_success',
-                    'message': 'Login successful'
+                    'message': 'Login successful',
+                    'token': token
                 }))
                 authenticated = True
                 clients[websocket] = username
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] User logged in: {username}")
+            
+            # Handle token-based authentication
+            elif auth_data.get('type') == 'token':
+                token = auth_data.get('token', '')
+                
+                if not token:
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'Token is required'
+                    }))
+                    continue
+                
+                # Verify the token and extract username
+                username = verify_jwt_token(token)
+                if not username:
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'Invalid or expired token'
+                    }))
+                    continue
+                
+                # Verify user still exists in database
+                user = db.get_user(username)
+                if not user:
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'User not found'
+                    }))
+                    continue
+                
+                await websocket.send_str(json.dumps({
+                    'type': 'auth_success',
+                    'message': 'Token authentication successful',
+                    'token': token
+                }))
+                authenticated = True
+                clients[websocket] = username
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] User authenticated via token: {username}")
             
             else:
                 await websocket.send_str(json.dumps({
