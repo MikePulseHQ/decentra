@@ -842,7 +842,8 @@ async def handler(websocket):
                             'context_id': context_id,
                             'avatar': user_profile.get('avatar', '👤') if user_profile else '👤',
                             'avatar_type': user_profile.get('avatar_type', 'emoji') if user_profile else 'emoji',
-                            'avatar_data': user_profile.get('avatar_data') if user_profile else None
+                            'avatar_data': user_profile.get('avatar_data') if user_profile else None,
+                            'reactions': []  # New messages have no reactions initially
                         }
                         
                         # Route message based on context
@@ -856,8 +857,9 @@ async def handler(websocket):
                                     members = db.get_server_members(server_id)
                                     member_usernames = {m['username'] for m in members}
                                     if username in member_usernames:
-                                        # Save message to database
-                                        db.save_message(username, msg_content, 'server', context_id)
+                                        # Save message to database and get ID
+                                        message_id = db.save_message(username, msg_content, 'server', context_id)
+                                        msg_obj['id'] = message_id
                                         
                                         # Broadcast to server members
                                         await broadcast_to_server(server_id, json.dumps(msg_obj))
@@ -868,8 +870,9 @@ async def handler(websocket):
                             dm_users = db.get_user_dms(username)
                             dm_ids = [dm['dm_id'] for dm in dm_users]
                             if context_id in dm_ids:
-                                # Save message to database
-                                db.save_message(username, msg_content, 'dm', context_id)
+                                # Save message to database and get ID
+                                message_id = db.save_message(username, msg_content, 'dm', context_id)
+                                msg_obj['id'] = message_id
                                 
                                 # Get participants and send to both
                                 for dm in dm_users:
@@ -956,6 +959,16 @@ async def handler(websocket):
                             # Get messages from database
                             context_id = f"{server_id}/{channel_id}"
                             channel_messages = db.get_messages('server', context_id, MAX_HISTORY)
+                            
+                            # Get reactions for all messages
+                            if channel_messages:
+                                message_ids = [msg['id'] for msg in channel_messages]
+                                reactions_map = db.get_reactions_for_messages(message_ids)
+                                
+                                # Add reactions to each message
+                                for msg in channel_messages:
+                                    msg['reactions'] = reactions_map.get(msg['id'], [])
+                            
                             await websocket.send_str(json.dumps({
                                 'type': 'channel_history',
                                 'server_id': server_id,
@@ -972,6 +985,16 @@ async def handler(websocket):
                         if dm_id in dm_ids:
                             # Get messages from database
                             dm_messages = db.get_messages('dm', dm_id, MAX_HISTORY)
+                            
+                            # Get reactions for all messages
+                            if dm_messages:
+                                message_ids = [msg['id'] for msg in dm_messages]
+                                reactions_map = db.get_reactions_for_messages(message_ids)
+                                
+                                # Add reactions to each message
+                                for msg in dm_messages:
+                                    msg['reactions'] = reactions_map.get(msg['id'], [])
+                            
                             await websocket.send_str(json.dumps({
                                 'type': 'dm_history',
                                 'dm_id': dm_id,
@@ -2217,6 +2240,177 @@ async def handler(websocket):
                                 'from': username,
                                 'candidate': candidate
                             }))
+                    
+                    # Custom emoji handlers
+                    elif data.get('type') == 'upload_custom_emoji':
+                        server_id = data.get('server_id', '')
+                        emoji_name = data.get('name', '').strip()
+                        image_data = data.get('image_data', '')
+                        
+                        if server_id and emoji_name and image_data:
+                            # Verify user is a member of the server
+                            server = db.get_server(server_id)
+                            if server:
+                                members = db.get_server_members(server_id)
+                                member_usernames = {m['username'] for m in members}
+                                
+                                if username in member_usernames:
+                                    # Generate emoji ID
+                                    emoji_id = f"emoji_{server_id}_{secrets.token_hex(8)}"
+                                    
+                                    # Create the custom emoji
+                                    if db.create_custom_emoji(emoji_id, server_id, emoji_name, image_data, username):
+                                        # Get the emoji data
+                                        emoji = db.get_custom_emoji(emoji_id)
+                                        
+                                        # Broadcast to all server members
+                                        await broadcast_to_server(server_id, json.dumps({
+                                            'type': 'custom_emoji_added',
+                                            'server_id': server_id,
+                                            'emoji': emoji
+                                        }))
+                                        
+                                        # Confirm to uploader
+                                        await websocket.send_str(json.dumps({
+                                            'type': 'emoji_upload_success',
+                                            'emoji': emoji
+                                        }))
+                                        print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} uploaded emoji '{emoji_name}' to server {server_id}")
+                                    else:
+                                        await websocket.send_str(json.dumps({
+                                            'type': 'error',
+                                            'message': 'Emoji name already exists in this server'
+                                        }))
+                                else:
+                                    await websocket.send_str(json.dumps({
+                                        'type': 'error',
+                                        'message': 'You are not a member of this server'
+                                    }))
+                    
+                    elif data.get('type') == 'get_server_emojis':
+                        server_id = data.get('server_id', '')
+                        
+                        if server_id:
+                            server = db.get_server(server_id)
+                            if server:
+                                members = db.get_server_members(server_id)
+                                member_usernames = {m['username'] for m in members}
+                                
+                                if username in member_usernames:
+                                    emojis = db.get_server_emojis(server_id)
+                                    await websocket.send_str(json.dumps({
+                                        'type': 'server_emojis',
+                                        'server_id': server_id,
+                                        'emojis': emojis
+                                    }))
+                    
+                    elif data.get('type') == 'delete_custom_emoji':
+                        emoji_id = data.get('emoji_id', '')
+                        
+                        if emoji_id:
+                            emoji = db.get_custom_emoji(emoji_id)
+                            if emoji:
+                                server = db.get_server(emoji['server_id'])
+                                # Only server owner or emoji uploader can delete
+                                if server and (username == server['owner'] or username == emoji['uploader']):
+                                    if db.delete_custom_emoji(emoji_id):
+                                        # Broadcast to all server members
+                                        await broadcast_to_server(emoji['server_id'], json.dumps({
+                                            'type': 'custom_emoji_deleted',
+                                            'server_id': emoji['server_id'],
+                                            'emoji_id': emoji_id
+                                        }))
+                                        
+                                        await websocket.send_str(json.dumps({
+                                            'type': 'emoji_delete_success',
+                                            'emoji_id': emoji_id
+                                        }))
+                                        print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} deleted emoji {emoji_id}")
+                                else:
+                                    await websocket.send_str(json.dumps({
+                                        'type': 'error',
+                                        'message': 'You do not have permission to delete this emoji'
+                                    }))
+                    
+                    # Message reaction handlers
+                    elif data.get('type') == 'add_reaction':
+                        message_id = data.get('message_id')
+                        emoji = data.get('emoji', '')
+                        emoji_type = data.get('emoji_type', 'standard')  # 'standard' or 'custom'
+                        
+                        if message_id and emoji:
+                            # Add the reaction
+                            if db.add_reaction(message_id, username, emoji, emoji_type):
+                                # Get message to determine context for broadcasting
+                                message = db.get_message(message_id)
+                                if message:
+                                    # Get all reactions for this message
+                                    reactions = db.get_message_reactions(message_id)
+                                    
+                                    reaction_update = {
+                                        'type': 'reaction_added',
+                                        'message_id': message_id,
+                                        'reactions': reactions
+                                    }
+                                    
+                                    # Broadcast to appropriate context
+                                    if message['context_type'] == 'server' and message['context_id']:
+                                        server_id = message['context_id'].split('/')[0]
+                                        await broadcast_to_server(server_id, json.dumps(reaction_update))
+                                    elif message['context_type'] == 'dm' and message['context_id']:
+                                        # Get DM participants
+                                        dm_users = db.get_user_dms(username)
+                                        for dm in dm_users:
+                                            if dm['dm_id'] == message['context_id']:
+                                                participants = [dm['user1'], dm['user2']]
+                                                for participant in participants:
+                                                    await send_to_user(participant, json.dumps(reaction_update))
+                                                break
+                                    
+                                    print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} added reaction {emoji} to message {message_id}")
+                            else:
+                                # Reaction already exists - just return current reactions
+                                reactions = db.get_message_reactions(message_id)
+                                await websocket.send_str(json.dumps({
+                                    'type': 'reaction_added',
+                                    'message_id': message_id,
+                                    'reactions': reactions
+                                }))
+                    
+                    elif data.get('type') == 'remove_reaction':
+                        message_id = data.get('message_id')
+                        emoji = data.get('emoji', '')
+                        
+                        if message_id and emoji:
+                            # Remove the reaction
+                            if db.remove_reaction(message_id, username, emoji):
+                                # Get message to determine context for broadcasting
+                                message = db.get_message(message_id)
+                                if message:
+                                    # Get all reactions for this message
+                                    reactions = db.get_message_reactions(message_id)
+                                    
+                                    reaction_update = {
+                                        'type': 'reaction_removed',
+                                        'message_id': message_id,
+                                        'reactions': reactions
+                                    }
+                                    
+                                    # Broadcast to appropriate context
+                                    if message['context_type'] == 'server' and message['context_id']:
+                                        server_id = message['context_id'].split('/')[0]
+                                        await broadcast_to_server(server_id, json.dumps(reaction_update))
+                                    elif message['context_type'] == 'dm' and message['context_id']:
+                                        # Get DM participants
+                                        dm_users = db.get_user_dms(username)
+                                        for dm in dm_users:
+                                            if dm['dm_id'] == message['context_id']:
+                                                participants = [dm['user1'], dm['user2']]
+                                                for participant in participants:
+                                                    await send_to_user(participant, json.dumps(reaction_update))
+                                                break
+                                    
+                                    print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} removed reaction {emoji} from message {message_id}")
                     
                     elif data.get('type') == 'start_voice_call':
                         # Direct voice call with a friend
