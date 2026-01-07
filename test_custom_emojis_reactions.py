@@ -48,20 +48,21 @@ def test_custom_emojis_and_reactions():
     print("\nTest 3: Testing custom emoji creation...")
     
     # Create a simple base64 encoded test image (1x1 red pixel PNG)
-    test_image_data = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
+    # This is a minimal valid PNG image for testing purposes
+    TEST_IMAGE_DATA = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
     
     # Alice uploads an emoji
-    success = db.create_custom_emoji("emoji_1", "server_1", "happy_cat", test_image_data, "alice")
+    success = db.create_custom_emoji("emoji_1", "server_1", "happy_cat", TEST_IMAGE_DATA, "alice")
     assert success, "Failed to create custom emoji"
     print("✓ Custom emoji 'happy_cat' created by alice")
     
     # Bob uploads another emoji
-    success = db.create_custom_emoji("emoji_2", "server_1", "party", test_image_data, "bob")
+    success = db.create_custom_emoji("emoji_2", "server_1", "party", TEST_IMAGE_DATA, "bob")
     assert success, "Failed to create second custom emoji"
     print("✓ Custom emoji 'party' created by bob")
     
     # Test duplicate emoji name (should fail)
-    success = db.create_custom_emoji("emoji_3", "server_1", "happy_cat", test_image_data, "charlie")
+    success = db.create_custom_emoji("emoji_3", "server_1", "happy_cat", TEST_IMAGE_DATA, "charlie")
     assert not success, "Duplicate emoji name should have failed"
     print("✓ Duplicate emoji name correctly rejected")
     

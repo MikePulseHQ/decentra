@@ -1294,7 +1294,17 @@ class Database:
             return [dict(row) for row in cursor.fetchall()]
     
     def get_reactions_for_messages(self, message_ids: List[int]) -> Dict[int, List[Dict]]:
-        """Get reactions for multiple messages."""
+        """
+        Get reactions for multiple messages.
+        
+        Args:
+            message_ids: List of message IDs to get reactions for
+            
+        Returns:
+            Dictionary mapping message IDs to lists of reaction dictionaries.
+            Each reaction dict contains: username, emoji, emoji_type, created_at
+            Example: {123: [{'username': 'alice', 'emoji': '👍', ...}], 124: [...]}
+        """
         if not message_ids:
             return {}
         
