@@ -814,6 +814,20 @@
                     dmProfileUpdate.status_message = data.status_message || '';
                     updateDMsList();
                 }
+                
+                // Update profile in current server members list, if available
+                if (typeof currentServerMembers !== 'undefined' && Array.isArray(currentServerMembers)) {
+                    const memberProfileUpdate = currentServerMembers.find(m => 
+                        (typeof m === 'object' ? m.username : m) === data.username
+                    );
+                    if (memberProfileUpdate && typeof memberProfileUpdate === 'object') {
+                        memberProfileUpdate.bio = data.bio || '';
+                        memberProfileUpdate.status_message = data.status_message || '';
+                        if (typeof updateServerMembersList === 'function') {
+                            updateServerMembersList();
+                        }
+                    }
+                }
                 break;
             
             case 'profile_updated':
