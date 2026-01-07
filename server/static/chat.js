@@ -3671,7 +3671,10 @@
         // Keyboard support for overlay (Enter/Space keys)
         mobileOverlay.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
+                // Prevent default for Space to avoid scrolling
+                if (e.key === ' ') {
+                    e.preventDefault();
+                }
                 closeMobileSidebars();
             }
         });
