@@ -3653,6 +3653,14 @@
         mobileOverlay.addEventListener('click', closeMobileSidebars);
     }
     
+    // Allow closing mobile sidebars with the Escape key for keyboard users
+    document.addEventListener('keydown', (e) => {
+        // Only act on Escape and when a mobile sidebar is currently open
+        if ((e.key === 'Escape' || e.key === 'Esc') && currentMobileSidebar) {
+            closeMobileSidebars();
+        }
+    });
+    
     // Close mobile sidebar when selecting an item
     function setupMobileClose() {
         // Close when clicking server/channel/DM items
