@@ -40,7 +40,7 @@ class EncryptionManager:
         # Try to get key from environment
         env_key = os.getenv('DECENTRA_ENCRYPTION_KEY')
         
-        if not env_key:
+        if not env_key or not env_key.strip():
             error_msg = (
                 "\n" + "=" * 80 + "\n"
                 "ERROR: DECENTRA_ENCRYPTION_KEY environment variable is not set.\n"
