@@ -3623,6 +3623,11 @@
         if (middleSidebar) middleSidebar.classList.remove('mobile-visible');
         if (mobileOverlay) mobileOverlay.classList.remove('active');
         currentMobileSidebar = null;
+        
+        // Update aria-expanded attribute
+        if (mobileMenuToggle) {
+            mobileMenuToggle.setAttribute('aria-expanded', 'false');
+        }
     }
     
     function openMobileSidebar(sidebar) {
@@ -3631,6 +3636,11 @@
             sidebar.classList.add('mobile-visible');
             if (mobileOverlay) mobileOverlay.classList.add('active');
             currentMobileSidebar = sidebar;
+            
+            // Update aria-expanded attribute
+            if (mobileMenuToggle) {
+                mobileMenuToggle.setAttribute('aria-expanded', 'true');
+            }
         }
     }
     
@@ -3657,6 +3667,14 @@
     
     if (mobileOverlay) {
         mobileOverlay.addEventListener('click', closeMobileSidebars);
+        
+        // Keyboard support for overlay (Enter/Space keys)
+        mobileOverlay.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                closeMobileSidebars();
+            }
+        });
     }
     
     // Allow closing mobile sidebars with the Escape key for keyboard users
@@ -3671,7 +3689,9 @@
     function setupMobileClose() {
         // Close when clicking server/channel/DM items
         document.addEventListener('click', (e) => {
-            if (e.target.closest('.server-item, .channel-item, .dm-item, .friend-item')) {
+            // Only close if we're on mobile and a sidebar is currently open
+            const isMobile = window.innerWidth <= MOBILE_BREAKPOINT;
+            if (isMobile && currentMobileSidebar && e.target.closest('.server-item, .channel-item, .dm-item, .friend-item')) {
                 // Delay ensures navigation completes before closing; prevents race conditions
                 setTimeout(closeMobileSidebars, MOBILE_SIDEBAR_CLOSE_DELAY);
             }
@@ -3688,7 +3708,21 @@
         }
     }
     
-    window.addEventListener('resize', updateMobileMenu);
+    // Debounce helper to prevent excessive resize event calls
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+    
+    // Debounce resize handler to improve performance
+    window.addEventListener('resize', debounce(updateMobileMenu, 150));
     updateMobileMenu();
     
     

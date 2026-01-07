@@ -1048,6 +1048,8 @@ body::before {
         position: fixed;
         top: 0;
         left: -100%;
+        width: 280px;
+        max-width: 80vw;
         height: 100vh;
         z-index: 1001;
         transition: left 0.3s ease;
