@@ -6,7 +6,7 @@ This test verifies the token generation and verification functionality.
 
 import sys
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Add server directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'server'))
@@ -27,10 +27,11 @@ def test_jwt_token_functions():
     
     def generate_jwt_token(username):
         """Generate a JWT token for a user."""
+        now = datetime.now(timezone.utc)
         payload = {
             'username': username,
-            'exp': datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS),
-            'iat': datetime.utcnow()
+            'exp': now + timedelta(hours=JWT_EXPIRATION_HOURS),
+            'iat': now
         }
         token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
         return token
@@ -91,8 +92,8 @@ def test_jwt_token_functions():
     assert 'username' in decoded, "Token should have username field"
     
     # Check that expiration is in the future
-    exp_time = datetime.fromtimestamp(decoded['exp'])
-    now = datetime.utcnow()
+    exp_time = datetime.fromtimestamp(decoded['exp'], timezone.utc)
+    now = datetime.now(timezone.utc)
     assert exp_time > now, "Token expiration should be in the future"
     
     # Check that token expires in approximately 24 hours
@@ -101,7 +102,7 @@ def test_jwt_token_functions():
     assert time_diff.total_seconds() > (expected_hours - 1) * 3600, "Token should expire in ~24 hours"
     assert time_diff.total_seconds() < (expected_hours + 1) * 3600, "Token should expire in ~24 hours"
     
-    print(f"  Token issued at: {datetime.fromtimestamp(decoded['iat'])}")
+    print(f"  Token issued at: {datetime.fromtimestamp(decoded['iat'], timezone.utc)}")
     print(f"  Token expires at: {exp_time}")
     print(f"  Time until expiration: {time_diff}")
     print("  ✓ Token has proper expiration (24 hours)")
@@ -109,10 +110,11 @@ def test_jwt_token_functions():
     # Test Case 5: Expired token
     print("\nTest 5: Verify expired token is rejected")
     # Create a token that expired 1 hour ago
+    now_utc = datetime.now(timezone.utc)
     expired_payload = {
         'username': 'expired_user',
-        'exp': datetime.utcnow() - timedelta(hours=1),
-        'iat': datetime.utcnow() - timedelta(hours=25)
+        'exp': now_utc - timedelta(hours=1),
+        'iat': now_utc - timedelta(hours=25)
     }
     expired_token = jwt.encode(expired_payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
     verified_expired = verify_jwt_token(expired_token)
