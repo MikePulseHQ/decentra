@@ -119,7 +119,7 @@ def test_profile():
             # Note: There's no delete_user method in the Database class,
             # so we'll just note that cleanup would happen here in a production test
             print(f"\nNote: Test user '{test_user}' was created and should be cleaned up manually if needed.")
-        except:
+        except Exception:
             pass
 
 if __name__ == "__main__":
