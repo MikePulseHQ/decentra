@@ -1829,7 +1829,7 @@ async def handler(websocket):
                             continue
                         
                         # Update profile in database
-                        db.update_user_profile(username, bio, status_message)
+                        db.update_user_profile(username, bio=bio, status_message=status_message)
                         
                         # Get updated user data
                         user_data = db.get_user(username)
