@@ -7,9 +7,6 @@ import os
 import sys
 import unittest
 
-# Save original environment
-original_env = os.environ.get('DECENTRA_ENCRYPTION_KEY')
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'server'))
 
 
@@ -17,7 +14,10 @@ class TestEncryptionKeyRequired(unittest.TestCase):
     """Test that encryption key is required for the application to start."""
     
     def setUp(self):
-        """Set up test by clearing the encryption key environment variable."""
+        """Set up test by saving and clearing the encryption key environment variable."""
+        # Save the original encryption key for this test instance
+        self.original_env = os.environ.get('DECENTRA_ENCRYPTION_KEY')
+        
         # Remove the encryption key if it exists
         if 'DECENTRA_ENCRYPTION_KEY' in os.environ:
             del os.environ['DECENTRA_ENCRYPTION_KEY']
@@ -29,8 +29,8 @@ class TestEncryptionKeyRequired(unittest.TestCase):
     def tearDown(self):
         """Restore original environment."""
         # Restore the original encryption key
-        if original_env:
-            os.environ['DECENTRA_ENCRYPTION_KEY'] = original_env
+        if self.original_env is not None:
+            os.environ['DECENTRA_ENCRYPTION_KEY'] = self.original_env
         elif 'DECENTRA_ENCRYPTION_KEY' in os.environ:
             del os.environ['DECENTRA_ENCRYPTION_KEY']
         
