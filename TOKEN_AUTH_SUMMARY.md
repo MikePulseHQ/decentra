@@ -44,7 +44,7 @@ This implementation switches from password-based authentication to JWT token-bas
 ### 3. Security Improvements
 - Passwords are no longer stored in `sessionStorage` after initial authentication
 - JWT tokens automatically expire after 24 hours
-- Tokens are stateless and can be validated without database lookups
+- Token validation includes JWT signature verification and user existence check
 - Expired or invalid tokens are properly rejected
 
 ### 4. Testing
@@ -69,7 +69,7 @@ Created comprehensive test suite (`test_token_auth.py`) that validates:
 ## Benefits
 1. **Enhanced Security**: Passwords are no longer stored in browser storage
 2. **Token Expiration**: Automatic session timeout after 24 hours
-3. **Stateless Authentication**: Tokens can be verified without database lookups
+3. **Efficient Authentication**: JWT signature verification reduces authentication overhead, with user validation performed only on connection
 4. **Seamless Reconnection**: Users can reconnect after server restarts using tokens
 5. **Industry Standard**: Uses JWT, a widely-adopted authentication standard
 

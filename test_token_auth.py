@@ -7,9 +7,19 @@ This test verifies the token generation and verification functionality.
 import sys
 import os
 from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock
+
+# Set a fixed JWT secret key for tests to ensure consistent behavior
+os.environ['JWT_SECRET_KEY'] = 'test-jwt-secret-key-for-consistent-testing'
 
 # Add server directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'server'))
+
+# Mock the database and other dependencies to prevent connection attempts during import
+sys.modules['database'] = MagicMock()
+sys.modules['api'] = MagicMock()
+sys.modules['email_utils'] = MagicMock()
+sys.modules['ssl_utils'] = MagicMock()
 
 def test_jwt_token_functions():
     """Test JWT token generation and verification."""
@@ -59,6 +69,9 @@ def test_jwt_token_functions():
     # Test Case 4: Token expiration check (this won't expire in test, just verify structure)
     print("\nTest 4: Verify token has expiration")
     
+    # Import jwt for token structure inspection
+    import jwt
+    
     # Decode without verification to check structure
     decoded = jwt.decode(token, options={"verify_signature": False})
     assert 'exp' in decoded, "Token should have expiration field"
@@ -83,7 +96,8 @@ def test_jwt_token_functions():
     
     # Test Case 5: Expired token
     print("\nTest 5: Verify expired token is rejected")
-    # Create a token that expired 1 hour ago
+    # Create a token that expired 1 hour ago using the same config as server
+    from server import JWT_SECRET_KEY, JWT_ALGORITHM
     now_utc = datetime.now(timezone.utc)
     expired_payload = {
         'username': 'expired_user',
