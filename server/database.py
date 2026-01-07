@@ -483,6 +483,9 @@ class Database:
     
     def update_user_profile(self, username: str, bio: str = None, status_message: str = None):
         """Update user profile bio and/or status message."""
+        if bio is None and status_message is None:
+            return  # Nothing to update
+        
         with self.get_connection() as conn:
             cursor = conn.cursor()
             if bio is not None and status_message is not None:
