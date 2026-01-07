@@ -111,7 +111,7 @@ def generate_self_signed_cert(cert_dir='certs', cert_file='cert.pem', key_file='
     print(f"SSL certificate generated successfully!")
     print(f"Certificate: {cert_path}")
     print(f"Private key: {key_path}")
-    print(f"Valid until: {cert.not_valid_after}")
+    print(f"Valid until: {cert.not_valid_after_utc}")
     
     return cert_path, key_path
 
