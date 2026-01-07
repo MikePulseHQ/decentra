@@ -3645,7 +3645,7 @@
     }
     
     if (mobileMenuToggle) {
-        mobileMenuToggle.addEventListener('click', () => {
+        mobileMenuToggle.addEventListener('click', (e) => {
             // Smart sidebar selection for mobile navigation:
             // - If no sidebar is visible, show left sidebar (servers) first
             // - If left sidebar (servers) is currently visible, switch to middle sidebar (channels)
@@ -3692,7 +3692,7 @@
         // Close when clicking server/channel/DM items
         document.addEventListener('click', (e) => {
             // Skip if clicking the mobile menu toggle button
-            if (e.target.closest('#mobile-menu-toggle')) {
+            if (mobileMenuToggle && (e.target === mobileMenuToggle || mobileMenuToggle.contains(e.target))) {
                 return;
             }
             
