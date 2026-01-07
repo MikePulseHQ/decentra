@@ -32,7 +32,6 @@ def test_jwt_token_functions():
     # Test Case 1: Generate and verify valid token
     print("\nTest 1: Generate and verify valid token")
     username = "test_user"
-    username = "test_user"
     token = generate_jwt_token(username)
     print(f"  Generated token: {token[:20]}...")
     
