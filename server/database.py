@@ -60,7 +60,9 @@ class Database:
                             avatar_data TEXT,
                             notification_mode VARCHAR(50) DEFAULT 'all',
                             email VARCHAR(255),
-                            email_verified BOOLEAN DEFAULT FALSE
+                            email_verified BOOLEAN DEFAULT FALSE,
+                            bio TEXT DEFAULT '',
+                            status_message VARCHAR(255) DEFAULT ''
                         )
                     ''')
                     

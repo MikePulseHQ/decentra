@@ -1180,8 +1180,21 @@
                 const friendUsername = typeof friend === 'object' ? friend.username : friend;
                 const avatarEl = createAvatarElement(friend, 'friend-avatar');
                 
+                const userInfoDiv = document.createElement('div');
+                userInfoDiv.className = 'friend-info';
+                
                 const nameSpan = document.createElement('span');
+                nameSpan.className = 'friend-name';
                 nameSpan.textContent = friendUsername;
+                userInfoDiv.appendChild(nameSpan);
+                
+                // Add status message if available
+                if (typeof friend === 'object' && friend.status_message) {
+                    const statusSpan = document.createElement('span');
+                    statusSpan.className = 'friend-status';
+                    statusSpan.textContent = friend.status_message;
+                    userInfoDiv.appendChild(statusSpan);
+                }
                 
                 const actionsDiv = document.createElement('div');
                 actionsDiv.className = 'friend-actions';
@@ -1200,7 +1213,7 @@
                 actionsDiv.appendChild(callBtn);
                 actionsDiv.appendChild(dmBtn);
                 friendItem.appendChild(avatarEl);
-                friendItem.appendChild(nameSpan);
+                friendItem.appendChild(userInfoDiv);
                 friendItem.appendChild(actionsDiv);
                 friendsList.appendChild(friendItem);
             });
