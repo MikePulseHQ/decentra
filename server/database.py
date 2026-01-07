@@ -396,7 +396,7 @@ class Database:
                                 SELECT 1 FROM information_schema.columns 
                                 WHERE table_name = 'users' AND column_name = 'status_message'
                             ) THEN
-                                ALTER TABLE users ADD COLUMN status_message VARCHAR(255) DEFAULT '';
+                                ALTER TABLE users ADD COLUMN status_message VARCHAR(100) DEFAULT '';
                             END IF;
                         END $$;
                     ''')
