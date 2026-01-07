@@ -910,18 +910,22 @@ async def handler(websocket):
                                 db.accept_friend_request(friend_username, username)
                                 
                                 friend_avatar = get_avatar_data(friend_username)
+                                friend_profile = get_profile_data(friend_username)
                                 await websocket.send_str(json.dumps({
                                     'type': 'friend_added',
                                     'username': friend_username,
-                                    **friend_avatar
+                                    **friend_avatar,
+                                    **friend_profile
                                 }))
                                 
                                 # Notify the other user
                                 user_avatar = get_avatar_data(username)
+                                user_profile = get_profile_data(username)
                                 await send_to_user(friend_username, json.dumps({
                                     'type': 'friend_added',
                                     'username': username,
-                                    **user_avatar
+                                    **user_avatar,
+                                    **user_profile
                                 }))
                                 print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} and {friend_username} are now friends (mutual request)")
                             else:
@@ -929,18 +933,22 @@ async def handler(websocket):
                                 db.add_friend_request(username, friend_username)
                                 
                                 friend_avatar = get_avatar_data(friend_username)
+                                friend_profile = get_profile_data(friend_username)
                                 await websocket.send_str(json.dumps({
                                     'type': 'friend_request_sent',
                                     'username': friend_username,
-                                    **friend_avatar
+                                    **friend_avatar,
+                                    **friend_profile
                                 }))
                                 
                                 # Notify the other user
                                 user_avatar = get_avatar_data(username)
+                                user_profile = get_profile_data(username)
                                 await send_to_user(friend_username, json.dumps({
                                     'type': 'friend_request_received',
                                     'username': username,
-                                    **user_avatar
+                                    **user_avatar,
+                                    **user_profile
                                 }))
                                 print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} sent friend request to {friend_username}")
                     
@@ -966,18 +974,22 @@ async def handler(websocket):
                             db.accept_friend_request(requester_username, username)
                             
                             requester_avatar = get_avatar_data(requester_username)
+                            requester_profile = get_profile_data(requester_username)
                             await websocket.send_str(json.dumps({
                                 'type': 'friend_request_approved',
                                 'username': requester_username,
-                                **requester_avatar
+                                **requester_avatar,
+                                **requester_profile
                             }))
                             
                             # Notify the requester
                             user_avatar = get_avatar_data(username)
+                            user_profile = get_profile_data(username)
                             await send_to_user(requester_username, json.dumps({
                                 'type': 'friend_request_accepted',
                                 'username': username,
-                                **user_avatar
+                                **user_avatar,
+                                **user_profile
                             }))
                             print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} approved friend request from {requester_username}")
                     
@@ -1027,24 +1039,28 @@ async def handler(websocket):
                             dm_id = get_or_create_dm(username, friend_username)
                             
                             friend_avatar = get_avatar_data(friend_username)
+                            friend_profile = get_profile_data(friend_username)
                             dm_info = {
                                 'type': 'dm_started',
                                 'dm': {
                                     'id': dm_id,
                                     'username': friend_username,
-                                    **friend_avatar
+                                    **friend_avatar,
+                                    **friend_profile
                                 }
                             }
                             await websocket.send_str(json.dumps(dm_info))
                             
                             # Notify the other user
                             user_avatar = get_avatar_data(username)
+                            user_profile = get_profile_data(username)
                             await send_to_user(friend_username, json.dumps({
                                 'type': 'dm_started',
                                 'dm': {
                                     'id': dm_id,
                                     'username': username,
-                                    **user_avatar
+                                    **user_avatar,
+                                    **user_profile
                                 }
                             }))
                     
