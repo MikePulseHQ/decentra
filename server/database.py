@@ -315,6 +315,12 @@ class Database:
                             ) THEN
                                 ALTER TABLE admin_settings ADD COLUMN smtp_use_tls BOOLEAN DEFAULT TRUE;
                             END IF;
+                            IF NOT EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name = 'admin_settings' AND column_name = 'require_email_verification'
+                            ) THEN
+                                ALTER TABLE admin_settings ADD COLUMN require_email_verification BOOLEAN DEFAULT FALSE;
+                            END IF;
                         END $$;
                     ''')
                     

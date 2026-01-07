@@ -297,6 +297,7 @@ async def handler(websocket):
                 admin_settings = db.get_admin_settings()
                 allow_registration = admin_settings.get('allow_registration', True)
                 require_invite = admin_settings.get('require_invite', False)
+                require_email_verification = admin_settings.get('require_email_verification', False)
                 
                 # Check if registration is disabled
                 if not allow_registration:
@@ -349,21 +350,25 @@ async def handler(websocket):
                     }))
                     continue
                 
-                # Generate verification code (6-digit number)
-                verification_code = ''.join(secrets.choice(string.digits) for _ in range(6))
-                
-                # Store verification code with 15 minute expiration
-                expires_at = datetime.now() + timedelta(minutes=15)
-                if not db.create_email_verification_code(email, username, verification_code, expires_at):
-                    await websocket.send_str(json.dumps({
-                        'type': 'auth_error',
-                        'message': 'Failed to generate verification code'
-                    }))
-                    continue
-                
-                # Send verification email
+                # Determine if email verification should be used
                 email_sender = EmailSender(admin_settings)
-                if email_sender.is_configured():
+                should_verify_email = require_email_verification and email_sender.is_configured()
+                
+                if should_verify_email:
+                    # Email verification is enabled and SMTP is configured
+                    # Generate verification code (6-digit number)
+                    verification_code = ''.join(secrets.choice(string.digits) for _ in range(6))
+                    
+                    # Store verification code with 15 minute expiration
+                    expires_at = datetime.now() + timedelta(minutes=15)
+                    if not db.create_email_verification_code(email, username, verification_code, expires_at):
+                        await websocket.send_str(json.dumps({
+                            'type': 'auth_error',
+                            'message': 'Failed to generate verification code'
+                        }))
+                        continue
+                    
+                    # Send verification email
                     if not email_sender.send_verification_email(email, username, verification_code):
                         await websocket.send_str(json.dumps({
                             'type': 'auth_error',
@@ -395,11 +400,41 @@ async def handler(websocket):
                         'message': 'Verification code sent to your email'
                     }))
                 else:
-                    # SMTP not configured, skip verification
+                    # Email verification is disabled or SMTP not configured - create account immediately
+                    # Create user account in database (email not verified)
+                    if not db.create_user(username, hash_password(password), email, email_verified=False):
+                        await websocket.send_str(json.dumps({
+                            'type': 'auth_error',
+                            'message': 'Failed to create account'
+                        }))
+                        continue
+                    
+                    # Auto-friend inviter if signing up with invite code
+                    inviter_username = invite_data['creator'] if invite_data else None
+                    if inviter_username:
+                        # Add mutual friendship
+                        db.add_friend_request(inviter_username, username)
+                        db.accept_friend_request(inviter_username, username)
+                        # Remove used invite code
+                        if invite_code:
+                            db.delete_invite_code(invite_code)
+                    
                     await websocket.send_str(json.dumps({
-                        'type': 'auth_error',
-                        'message': 'Email verification is required but SMTP is not configured. Please contact the administrator.'
+                        'type': 'auth_success',
+                        'message': 'Account created successfully'
                     }))
+                    authenticated = True
+                    clients[websocket] = username
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] New user registered: {username}")
+                    
+                    # Notify inviter that they are now friends
+                    if inviter_username:
+                        new_user_avatar = get_avatar_data(username)
+                        await send_to_user(inviter_username, json.dumps({
+                            'type': 'friend_added',
+                            'username': username,
+                            **new_user_avatar
+                        }))
                 continue
             
             # Handle email verification
