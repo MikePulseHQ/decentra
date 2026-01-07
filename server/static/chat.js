@@ -1,5 +1,5 @@
 // Chat page JavaScript with Servers, DMs, and Friends support
-(function() {
+(async function() {
     console.log('chat.js loaded and executing');
     // Check if user is authenticated
     const username = sessionStorage.getItem('username');
@@ -230,7 +230,7 @@
     let notificationManager = null;
     if (window.NotificationManager) {
         notificationManager = new NotificationManager();
-        notificationManager.init();
+        await notificationManager.init();
     }
     
     // Connect to WebSocket
