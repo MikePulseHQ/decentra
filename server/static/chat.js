@@ -1694,30 +1694,41 @@
             const actionsDiv = document.createElement('div');
             actionsDiv.className = 'message-actions';
             
-            // Show edit/delete buttons for own messages
-            if (isOwnMessage) {
-                actionsDiv.innerHTML = `
-                    <button class="message-action-btn edit-message-btn" title="Edit message">
-                        <span>✏️</span>
-                    </button>
-                    <button class="message-action-btn delete-message-btn" title="Delete message">
-                        <span>🗑️</span>
-                    </button>
-                `;
-            } else {
-                // For other users' messages, show buttons only if user has permissions
-                // We'll check permissions when buttons are clicked
-                actionsDiv.innerHTML = `
-                    <button class="message-action-btn edit-message-btn admin-action" title="Edit message" style="display: none;">
-                        <span>✏️</span>
-                    </button>
-                    <button class="message-action-btn delete-message-btn admin-action" title="Delete message" style="display: none;">
-                        <span>🗑️</span>
-                    </button>
-                `;
+            // Check if user has permissions for other users' messages
+            let canEditOthers = false;
+            let canDeleteOthers = false;
+            
+            if (!isOwnMessage && currentContext && currentContext.type === 'server') {
+                const server = servers.find(s => s.id === currentContext.serverId);
+                if (server) {
+                    // Server owner can edit/delete all messages
+                    if (server.owner === username) {
+                        canEditOthers = true;
+                        canDeleteOthers = true;
+                    } else if (server.permissions) {
+                        // Check member permissions
+                        canEditOthers = server.permissions.can_edit_messages || false;
+                        canDeleteOthers = server.permissions.can_delete_messages || false;
+                    }
+                }
             }
             
-            contentWrapper.appendChild(actionsDiv);
+            // Show edit/delete buttons for own messages or if user has permissions
+            if (isOwnMessage || canEditOthers || canDeleteOthers) {
+                const showEdit = isOwnMessage || canEditOthers;
+                const showDelete = isOwnMessage || canDeleteOthers;
+                
+                actionsDiv.innerHTML = `
+                    ${showEdit ? `<button class="message-action-btn edit-message-btn" title="Edit message">
+                        <span>✏️</span>
+                    </button>` : ''}
+                    ${showDelete ? `<button class="message-action-btn delete-message-btn" title="Delete message">
+                        <span>🗑️</span>
+                    </button>` : ''}
+                `;
+                
+                contentWrapper.appendChild(actionsDiv);
+            }
         }
         
         messageDiv.appendChild(avatarEl);
@@ -2431,11 +2442,13 @@
                 const permsDiv = document.createElement('div');
                 permsDiv.className = 'member-permissions';
                 
-                const permissions = ['can_create_channel', 'can_edit_channel', 'can_delete_channel'];
+                const permissions = ['can_create_channel', 'can_edit_channel', 'can_delete_channel', 'can_edit_messages', 'can_delete_messages'];
                 const permLabels = {
                     'can_create_channel': 'Create',
                     'can_edit_channel': 'Edit',
-                    'can_delete_channel': 'Delete'
+                    'can_delete_channel': 'Delete',
+                    'can_edit_messages': 'Edit Msgs',
+                    'can_delete_messages': 'Del Msgs'
                 };
                 
                 permissions.forEach(perm => {
@@ -2470,11 +2483,7 @@
         if (!server) return;
         
         // Get current permissions by reading from checkboxes using data attributes
-        const currentPerms = {
-            can_create_channel: false,
-            can_edit_channel: false,
-            can_delete_channel: false
-        };
+        const currentPerms = {};
         
         // Find the member's row and read all checkboxes
         document.querySelectorAll('.member-item').forEach(item => {
