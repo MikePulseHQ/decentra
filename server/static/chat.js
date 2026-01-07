@@ -230,7 +230,12 @@
     let notificationManager = null;
     if (window.NotificationManager) {
         notificationManager = new NotificationManager();
-        await notificationManager.init();
+        try {
+            await notificationManager.init();
+        } catch (error) {
+            console.error('Failed to initialize notification manager:', error);
+            // Continue without notifications - the app should still work
+        }
     }
     
     // Connect to WebSocket
