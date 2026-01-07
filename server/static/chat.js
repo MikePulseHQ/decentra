@@ -1619,13 +1619,29 @@
         
         const contentWrapper = document.createElement('div');
         contentWrapper.className = 'message-content-wrapper';
-        contentWrapper.innerHTML = `
-            <div class="message-header">
-                <span class="message-username ${isOwnMessage ? 'own' : 'other'}">${escapeHtml(msg.username)}</span>
-                <span class="message-time">${timestamp}</span>
-            </div>
-            <div class="message-content">${escapeHtml(msg.content)}</div>
+        
+        // Create message header
+        const messageHeader = document.createElement('div');
+        messageHeader.className = 'message-header';
+        messageHeader.innerHTML = `
+            <span class="message-username ${isOwnMessage ? 'own' : 'other'}">${escapeHtml(msg.username)}</span>
+            <span class="message-time">${timestamp}</span>
         `;
+        
+        // Create message content with linkified text
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+        messageContent.innerHTML = linkifyText(msg.content);
+        
+        // Add header and content to wrapper
+        contentWrapper.appendChild(messageHeader);
+        contentWrapper.appendChild(messageContent);
+        
+        // Process and add embeds
+        const embeds = processMessageEmbeds(msg.content);
+        embeds.forEach(embed => {
+            contentWrapper.appendChild(embed);
+        });
         
         messageDiv.appendChild(avatarEl);
         messageDiv.appendChild(contentWrapper);
@@ -3363,6 +3379,179 @@
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    // ========== Rich Embeds Functions ==========
+    
+    // URL regex to detect links in messages
+    const URL_REGEX = /(https?:\/\/[^\s]+)/gi;
+    
+    // Image extensions
+    const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?[^\s]*)?$/i;
+    
+    // Video extensions
+    const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg|mov)(\?[^\s]*)?$/i;
+    
+    // YouTube URL patterns
+    const YOUTUBE_REGEX = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/i;
+    
+    /**
+     * Detect if a URL is an image
+     */
+    function isImageUrl(url) {
+        return IMAGE_EXTENSIONS.test(url);
+    }
+    
+    /**
+     * Detect if a URL is a video
+     */
+    function isVideoUrl(url) {
+        return VIDEO_EXTENSIONS.test(url);
+    }
+    
+    /**
+     * Extract YouTube video ID from URL
+     */
+    function getYouTubeVideoId(url) {
+        const match = url.match(YOUTUBE_REGEX);
+        return match ? match[1] : null;
+    }
+    
+    /**
+     * Create an image embed element
+     */
+    function createImageEmbed(url) {
+        const embedDiv = document.createElement('div');
+        embedDiv.className = 'embed embed-image';
+        
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = 'Embedded image';
+        img.loading = 'lazy';
+        
+        // Add error handler in case image fails to load
+        img.onerror = function() {
+            embedDiv.innerHTML = `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="embed-link">🖼️ ${escapeHtml(url)}</a>`;
+        };
+        
+        // Make image clickable to open in new tab
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.appendChild(img);
+        
+        embedDiv.appendChild(link);
+        return embedDiv;
+    }
+    
+    /**
+     * Create a video embed element
+     */
+    function createVideoEmbed(url) {
+        const embedDiv = document.createElement('div');
+        embedDiv.className = 'embed embed-video';
+        
+        const video = document.createElement('video');
+        video.src = url;
+        video.controls = true;
+        video.preload = 'metadata';
+        
+        // Add error handler in case video fails to load
+        video.onerror = function() {
+            embedDiv.innerHTML = `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="embed-link">🎥 ${escapeHtml(url)}</a>`;
+        };
+        
+        embedDiv.appendChild(video);
+        return embedDiv;
+    }
+    
+    /**
+     * Create a YouTube embed element
+     */
+    function createYouTubeEmbed(videoId, url) {
+        const embedDiv = document.createElement('div');
+        embedDiv.className = 'embed embed-youtube';
+        
+        const iframe = document.createElement('iframe');
+        iframe.src = `https://www.youtube.com/embed/${videoId}`;
+        iframe.frameBorder = '0';
+        iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+        iframe.allowFullscreen = true;
+        iframe.title = 'YouTube video';
+        
+        embedDiv.appendChild(iframe);
+        return embedDiv;
+    }
+    
+    /**
+     * Create a link embed element for regular URLs
+     */
+    function createLinkEmbed(url) {
+        const embedDiv = document.createElement('div');
+        embedDiv.className = 'embed embed-link';
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = url;
+        
+        embedDiv.appendChild(link);
+        return embedDiv;
+    }
+    
+    /**
+     * Process message content and create embeds for URLs
+     */
+    function processMessageEmbeds(content) {
+        const embeds = [];
+        const urls = content.match(URL_REGEX);
+        
+        if (!urls) {
+            return embeds;
+        }
+        
+        // Track processed URLs to avoid duplicates
+        const processedUrls = new Set();
+        
+        urls.forEach(url => {
+            // Skip if already processed
+            if (processedUrls.has(url)) {
+                return;
+            }
+            processedUrls.add(url);
+            
+            // Check for YouTube videos first
+            const youtubeId = getYouTubeVideoId(url);
+            if (youtubeId) {
+                embeds.push(createYouTubeEmbed(youtubeId, url));
+            }
+            // Check for images
+            else if (isImageUrl(url)) {
+                embeds.push(createImageEmbed(url));
+            }
+            // Check for videos
+            else if (isVideoUrl(url)) {
+                embeds.push(createVideoEmbed(url));
+            }
+            // Regular link
+            else {
+                embeds.push(createLinkEmbed(url));
+            }
+        });
+        
+        return embeds;
+    }
+    
+    /**
+     * Make URLs in text clickable
+     */
+    function linkifyText(text) {
+        const escapedText = escapeHtml(text);
+        return escapedText.replace(URL_REGEX, (url) => {
+            return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="message-link">${url}</a>`;
+        });
     }
     
     // ========== Roles Management Functions ==========
