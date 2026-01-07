@@ -3608,7 +3608,6 @@
     
     // Mobile menu functionality
     const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-    const mobileMembersToggle = document.getElementById('mobile-members-toggle');
     const mobileOverlay = document.getElementById('mobile-overlay');
     const leftSidebar = document.getElementById('left-sidebar');
     const middleSidebar = document.getElementById('middle-sidebar');
@@ -3635,11 +3634,11 @@
     if (mobileMenuToggle) {
         mobileMenuToggle.addEventListener('click', (e) => {
             e.stopPropagation();
-            // Smart sidebar selection:
-            // If we're in a channel/DM context AND middle sidebar is showing channels,
-            // toggle to show the left sidebar (servers/DMs list)
-            // Otherwise, show the middle sidebar
-            if (currentMobileSidebar === middleSidebar || !currentContext) {
+            // Smart sidebar selection for mobile navigation:
+            // - If middle sidebar (channels) is currently visible, switch to left sidebar (servers)
+            // - If no sidebar is visible or left sidebar is visible, show middle sidebar (channels)
+            // This creates a toggle behavior: hamburger menu -> channels -> servers -> channels...
+            if (currentMobileSidebar === middleSidebar) {
                 openMobileSidebar(leftSidebar);
             } else {
                 openMobileSidebar(middleSidebar);
@@ -3653,11 +3652,15 @@
     
     // Close mobile sidebar when selecting an item
     function setupMobileClose() {
+        // Delay ensures the navigation/selection event completes before closing the sidebar
+        // Without this delay, rapid clicks might not register properly
+        const MOBILE_SIDEBAR_CLOSE_DELAY = 100;
+        
         // Close when clicking server/channel/DM items
         document.addEventListener('click', (e) => {
             if (e.target.closest('.server-item, .channel-item, .dm-item, .friend-item')) {
-                // Small delay to allow the click to register
-                setTimeout(closeMobileSidebars, 100);
+                // Small delay to allow the click event to be processed before closing
+                setTimeout(closeMobileSidebars, MOBILE_SIDEBAR_CLOSE_DELAY);
             }
         });
     }

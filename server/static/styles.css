@@ -1062,9 +1062,9 @@ body::before {
         left: 0;
     }
     
-    /* Right sidebar always hidden on mobile */
+    /* Right sidebar always hidden on mobile to maximize chat space */
     .right-sidebar {
-        display: none !important;
+        display: none;
     }
     
     /* Full width chat container on mobile */
@@ -1076,7 +1076,6 @@ body::before {
     
     /* Add menu button to chat header */
     .chat-header {
-        flex-direction: row;
         gap: 10px;
         align-items: center;
         flex-wrap: wrap;
