@@ -24,6 +24,8 @@ class Database:
         self.db_url = db_url or os.getenv('DATABASE_URL', 
             'postgresql://decentra:decentra@localhost:5432/decentra')
         # Initialize encryption manager for message encryption
+        # Uses a shared encryption key for all messages to allow new users
+        # to read server message history when they join
         self.encryption_manager = get_encryption_manager()
         self.init_database()
     

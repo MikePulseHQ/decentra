@@ -140,14 +140,15 @@ def test_message_encryption():
     dm_messages = db.get_messages("dm", "dm_1", 100)
     assert len(dm_messages) >= 4, "Not all DM messages retrieved"
     
-    # Verify the last 3 messages
+    # Verify the last 3 messages are correct
     expected_dm_messages = [
         "Hey Bob!",
         "Hi Alice!",
         "How are you?"
     ]
+    last_three_messages = dm_messages[-3:]
     for i, expected in enumerate(expected_dm_messages):
-        assert dm_messages[-(3-i)]['content'] == expected, f"DM message {i} content mismatch"
+        assert last_three_messages[i]['content'] == expected, f"DM message {i} content mismatch"
     print(f"✓ All {len(dm_messages)} DM messages encrypted and decrypted correctly")
     
     # Test 8: Test special characters and unicode
