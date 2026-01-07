@@ -170,7 +170,7 @@ def test_message_encryption():
     ]
     
     for edge_case in edge_cases:
-        msg_id = db.save_message("alice", edge_case, "dm", "dm_1")
+        db.save_message("alice", edge_case, "dm", "dm_1")
         messages = db.get_messages("dm", "dm_1", 1)
         assert messages[0]['content'] == edge_case, f"Edge case '{repr(edge_case)}' not handled correctly"
     print(f"✓ Edge cases (empty, whitespace) handled correctly")

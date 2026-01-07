@@ -915,7 +915,11 @@ class Database:
     def save_message(self, username: str, content: str, context_type: str, context_id: Optional[str] = None) -> int:
         """Save a message and return its ID. Message content is encrypted before storage."""
         # Encrypt message content before storing
-        encrypted_content = self.encryption_manager.encrypt(content)
+        try:
+            encrypted_content = self.encryption_manager.encrypt(content)
+        except RuntimeError as e:
+            # Re-raise with additional context about the message save operation
+            raise RuntimeError(f"Failed to save message: encryption error - {e}") from e
         
         with self.get_connection() as conn:
             cursor = conn.cursor()

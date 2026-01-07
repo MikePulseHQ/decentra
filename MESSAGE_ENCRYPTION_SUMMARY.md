@@ -97,7 +97,7 @@ This requirement necessitates a **shared encryption key** approach:
 ### 4. Encryption Technology
 
 **Technology Used**: Fernet (Symmetric Encryption)
-- Based on AES-128 in CBC mode
+- Based on AES-128 in CTR mode
 - HMAC using SHA-256 for authentication
 - Provides both confidentiality and integrity
 - Part of the Python `cryptography` library
@@ -213,6 +213,8 @@ If not set, the application will:
 - Print security warnings to console
 - Use a default key (NOT SECURE for production)
 - Still function correctly for development/testing
+
+**⚠️ SECURITY WARNING**: Using the default encryption key means all messages are encrypted with a deterministic, hardcoded key known to anyone who can read the source code. In such deployments, an attacker who obtains a database backup can decrypt every stored message, effectively nullifying encryption at rest. **For production deployments, the application MUST have `DECENTRA_ENCRYPTION_KEY` set to a strong, unique value.**
 
 ### Migration from Plain Text
 
