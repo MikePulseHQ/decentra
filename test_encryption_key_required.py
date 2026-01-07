@@ -115,14 +115,18 @@ class TestEncryptionKeyRequired(unittest.TestCase):
     
     def test_whitespace_encryption_key_raises_error(self):
         """Test that whitespace-only encryption key raises RuntimeError."""
+        # Import encryption_utils module
+        from encryption_utils import EncryptionManager, reset_encryption_manager
+        
         # Test various whitespace-only values
         whitespace_values = ['   ', '\t', '\n', '  \t\n  ']
-        
-        from encryption_utils import EncryptionManager
         
         for whitespace_key in whitespace_values:
             # Set encryption key to whitespace-only string
             os.environ['DECENTRA_ENCRYPTION_KEY'] = whitespace_key
+            
+            # Reset any cached encryption manager
+            reset_encryption_manager()
             
             # Creating EncryptionManager should raise RuntimeError
             with self.assertRaises(RuntimeError) as context:
