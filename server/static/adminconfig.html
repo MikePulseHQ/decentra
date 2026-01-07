@@ -229,6 +229,14 @@
             <h2>Email & SMTP Settings</h2>
             
             <div class="setting-item">
+                <label for="require-email-verification">Require Email Verification</label>
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="require-email-verification">
+                    <span class="description" style="margin: 0;">Require users to verify their email address during registration (requires SMTP to be configured)</span>
+                </div>
+            </div>
+            
+            <div class="setting-item">
                 <label for="smtp-enabled">Enable Email Notifications</label>
                 <div class="checkbox-wrapper">
                     <input type="checkbox" id="smtp-enabled">
@@ -380,6 +388,7 @@
             document.getElementById('max-channels-per-server').value = settings.max_channels_per_server || 0;
             
             // Load SMTP settings
+            document.getElementById('require-email-verification').checked = settings.require_email_verification || false;
             document.getElementById('smtp-enabled').checked = settings.smtp_enabled || false;
             document.getElementById('smtp-host').value = settings.smtp_host || '';
             document.getElementById('smtp-port').value = settings.smtp_port || 587;
@@ -427,6 +436,7 @@
                 max_servers_per_user: parseInt(document.getElementById('max-servers-per-user').value, 10),
                 max_channels_per_server: parseInt(document.getElementById('max-channels-per-server').value, 10),
                 // SMTP settings
+                require_email_verification: document.getElementById('require-email-verification').checked,
                 smtp_enabled: document.getElementById('smtp-enabled').checked,
                 smtp_host: document.getElementById('smtp-host').value,
                 smtp_port: parseInt(document.getElementById('smtp-port').value, 10),
