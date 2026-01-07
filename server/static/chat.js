@@ -3606,6 +3606,75 @@
         });
     }
     
+    // Mobile menu functionality
+    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+    const mobileMembersToggle = document.getElementById('mobile-members-toggle');
+    const mobileOverlay = document.getElementById('mobile-overlay');
+    const leftSidebar = document.getElementById('left-sidebar');
+    const middleSidebar = document.getElementById('middle-sidebar');
+    
+    // Track which sidebar is currently open on mobile
+    let currentMobileSidebar = null;
+    
+    function closeMobileSidebars() {
+        if (leftSidebar) leftSidebar.classList.remove('mobile-visible');
+        if (middleSidebar) middleSidebar.classList.remove('mobile-visible');
+        if (mobileOverlay) mobileOverlay.classList.remove('active');
+        currentMobileSidebar = null;
+    }
+    
+    function openMobileSidebar(sidebar) {
+        closeMobileSidebars();
+        if (sidebar) {
+            sidebar.classList.add('mobile-visible');
+            if (mobileOverlay) mobileOverlay.classList.add('active');
+            currentMobileSidebar = sidebar;
+        }
+    }
+    
+    if (mobileMenuToggle) {
+        mobileMenuToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Smart sidebar selection:
+            // If we're in a channel/DM context AND middle sidebar is showing channels,
+            // toggle to show the left sidebar (servers/DMs list)
+            // Otherwise, show the middle sidebar
+            if (currentMobileSidebar === middleSidebar || !currentContext) {
+                openMobileSidebar(leftSidebar);
+            } else {
+                openMobileSidebar(middleSidebar);
+            }
+        });
+    }
+    
+    if (mobileOverlay) {
+        mobileOverlay.addEventListener('click', closeMobileSidebars);
+    }
+    
+    // Close mobile sidebar when selecting an item
+    function setupMobileClose() {
+        // Close when clicking server/channel/DM items
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.server-item, .channel-item, .dm-item, .friend-item')) {
+                // Small delay to allow the click to register
+                setTimeout(closeMobileSidebars, 100);
+            }
+        });
+    }
+    
+    setupMobileClose();
+    
+    // Update mobile menu behavior based on screen size
+    function updateMobileMenu() {
+        const isMobile = window.innerWidth <= 768;
+        if (!isMobile) {
+            closeMobileSidebars();
+        }
+    }
+    
+    window.addEventListener('resize', updateMobileMenu);
+    updateMobileMenu();
+    
     
     console.log('chat.js: About to call connect()');
     // Initialize connection
