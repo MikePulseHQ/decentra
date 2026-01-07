@@ -122,9 +122,8 @@
                 return;
             }
             
-            // Store credentials for WebSocket authentication
+            // Store credentials for WebSocket authentication (avoid storing password)
             sessionStorage.setItem('username', username);
-            sessionStorage.setItem('password', password);
             sessionStorage.setItem('email', email);
             sessionStorage.setItem('authMode', 'signup');
             sessionStorage.setItem('inviteCode', inviteCode);
@@ -138,9 +137,8 @@
                 return;
             }
             
-            // Store credentials for WebSocket authentication
+            // Store credentials for WebSocket authentication (avoid storing password)
             sessionStorage.setItem('username', username);
-            sessionStorage.setItem('password', password);
             sessionStorage.setItem('authMode', 'login');
             sessionStorage.setItem('inviteCode', inviteCode);
             
