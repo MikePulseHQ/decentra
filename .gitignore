@@ -35,6 +35,9 @@ server/static/chat-old.js
 # Environment variables
 .env
 
+# JWT secret key (auto-generated)
+.jwt_secret_key
+
 # SSL certificates (auto-generated)
 server/certs/
 certs/

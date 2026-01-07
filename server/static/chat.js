@@ -7,9 +7,14 @@
     const inviteCode = sessionStorage.getItem('inviteCode');
     const email = sessionStorage.getItem('email');
     const verificationCode = sessionStorage.getItem('verificationCode');
+    const token = sessionStorage.getItem('token');
     
-    // For verify_email mode, we only need username and verification code
-    if (authMode === 'verify_email') {
+    // If we have a token, we can authenticate with it
+    if (token && username) {
+        // Token authentication - no password needed
+        console.log('Using token authentication');
+    } else if (authMode === 'verify_email') {
+        // For verify_email mode, we only need username and verification code
         if (!username || !verificationCode) {
             window.location.href = '/static/index.html';
             return;
@@ -363,6 +368,19 @@
     
     // Authenticate with server
     function authenticate() {
+        const storedToken = sessionStorage.getItem('token');
+        
+        // If we have a valid token, use token-based authentication
+        if (storedToken) {
+            const authData = {
+                type: 'token',
+                token: storedToken
+            };
+            ws.send(JSON.stringify(authData));
+            return;
+        }
+        
+        // Otherwise, use password-based authentication
         const authData = {
             type: authMode,
             username: username
@@ -388,15 +406,20 @@
             case 'auth_success':
                 authenticated = true;
                 console.log('Authentication successful');
-                // Keep credentials in sessionStorage to allow reconnection after container restarts
-                // NOTE: Password is stored in sessionStorage (set by auth.js during login).
-                // While not ideal for security, it's necessary for WebSocket reconnection.
-                // TODO: Consider implementing token-based authentication for better security.
-                // sessionStorage.removeItem('password');
-                // sessionStorage.removeItem('authMode');
+                
+                // Store the JWT token for future reconnections
+                if (data.token) {
+                    sessionStorage.setItem('token', data.token);
+                    console.log('JWT token stored');
+                }
+                
+                // Clean up sensitive data - password is no longer needed
+                sessionStorage.removeItem('password');
+                sessionStorage.removeItem('authMode');
                 sessionStorage.removeItem('inviteCode');
                 sessionStorage.removeItem('email');
                 sessionStorage.removeItem('verificationCode');
+                
                 // Initialize voice chat
                 voiceChat = new VoiceChat(ws, username);
                 // Check if user is admin

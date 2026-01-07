@@ -7,7 +7,7 @@ A simple WebSocket-based chat server for decentralized communication.
 import asyncio
 import json
 import websockets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import bcrypt
 import secrets
 import string
@@ -17,6 +17,7 @@ from aiohttp import web
 import os
 import base64
 import hashlib
+import jwt
 from database import Database
 from api import setup_api_routes
 from email_utils import EmailSender
@@ -24,6 +25,49 @@ from ssl_utils import generate_self_signed_cert, create_ssl_context
 
 # Initialize database
 db = Database()
+
+# JWT Configuration
+# Generate or load a secure secret key for JWT tokens.
+# In production, JWT_SECRET_KEY should be provided via environment variable or a secrets manager.
+def _load_jwt_secret_key() -> str:
+    """
+    Load the JWT secret key from the environment or from a local secret file.
+
+    Precedence:
+    1. JWT_SECRET_KEY environment variable
+    2. Secret stored in .jwt_secret_key file alongside this server script
+    3. Newly generated secret, which is then persisted to the secret file
+    """
+    env_key = os.environ.get("JWT_SECRET_KEY")
+    if env_key:
+        return env_key
+
+    secret_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".jwt_secret_key")
+    try:
+        with open(secret_file, "r", encoding="utf-8") as f:
+            file_key = f.read().strip()
+            if file_key:
+                return file_key
+    except FileNotFoundError:
+        pass
+    except OSError:
+        # If the file cannot be read for any reason, fall back to generating a new key
+        pass
+
+    # Generate a new secret key and persist it for future restarts
+    new_key = secrets.token_urlsafe(32)
+    try:
+        # Best-effort persistence; if this fails, the key will only live for this process
+        with open(secret_file, "w", encoding="utf-8") as f:
+            f.write(new_key)
+    except OSError:
+        pass
+
+    return new_key
+
+JWT_SECRET_KEY = _load_jwt_secret_key()
+JWT_ALGORITHM = 'HS256'
+JWT_EXPIRATION_HOURS = 24  # Token expires after 24 hours
 
 # Store pending signups temporarily (in-memory)
 # Format: {username: {password_hash, email, invite_code, inviter_username}}
@@ -71,6 +115,29 @@ def serialize_role(role):
 def verify_password(password, password_hash):
     """Verify a password against its hash."""
     return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
+
+
+def generate_jwt_token(username):
+    """Generate a JWT token for a user."""
+    now = datetime.now(timezone.utc)
+    payload = {
+        'username': username,
+        'exp': now + timedelta(hours=JWT_EXPIRATION_HOURS),
+        'iat': now
+    }
+    token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+    return token
+
+
+def verify_jwt_token(token):
+    """Verify a JWT token and return the username if valid."""
+    try:
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        return payload.get('username')
+    except jwt.ExpiredSignatureError:
+        return None  # Token has expired
+    except jwt.InvalidTokenError:
+        return None  # Invalid token
 
 
 def is_valid_email(email):
@@ -372,7 +439,7 @@ async def handler(websocket):
                     verification_code = ''.join(secrets.choice(string.digits) for _ in range(6))
                     
                     # Store verification code with 15 minute expiration
-                    expires_at = datetime.now() + timedelta(minutes=15)
+                    expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
                     if not db.create_email_verification_code(email, username, verification_code, expires_at):
                         await websocket.send_str(json.dumps({
                             'type': 'auth_error',
@@ -431,9 +498,13 @@ async def handler(websocket):
                         if invite_code:
                             db.delete_invite_code(invite_code)
                     
+                    # Generate JWT token for the user
+                    token = generate_jwt_token(username)
+                    
                     await websocket.send_str(json.dumps({
                         'type': 'auth_success',
-                        'message': 'Account created successfully'
+                        'message': 'Account created successfully',
+                        'token': token
                     }))
                     authenticated = True
                     clients[websocket] = username
@@ -508,9 +579,13 @@ async def handler(websocket):
                     if pending['invite_code']:
                         db.delete_invite_code(pending['invite_code'])
                 
+                # Generate JWT token for the user
+                token = generate_jwt_token(username)
+                
                 await websocket.send_str(json.dumps({
                     'type': 'auth_success',
-                    'message': 'Account created successfully'
+                    'message': 'Account created successfully',
+                    'token': token
                 }))
                 authenticated = True
                 clients[websocket] = username
@@ -552,13 +627,58 @@ async def handler(websocket):
                     }))
                     continue
                 
+                # Generate JWT token for the user
+                token = generate_jwt_token(username)
+                
                 await websocket.send_str(json.dumps({
                     'type': 'auth_success',
-                    'message': 'Login successful'
+                    'message': 'Login successful',
+                    'token': token
                 }))
                 authenticated = True
                 clients[websocket] = username
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] User logged in: {username}")
+            
+            # Handle token-based authentication
+            elif auth_data.get('type') == 'token':
+                token = auth_data.get('token', '')
+                
+                if not token:
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'Token is required'
+                    }))
+                    continue
+                
+                # Verify the token and extract username
+                username = verify_jwt_token(token)
+                if not username:
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'Invalid or expired token'
+                    }))
+                    continue
+                
+                # Verify user still exists in database
+                user = db.get_user(username)
+                if not user:
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'User not found'
+                    }))
+                    continue
+                
+                # Generate a new JWT token to refresh the session
+                new_token = generate_jwt_token(username)
+                
+                await websocket.send_str(json.dumps({
+                    'type': 'auth_success',
+                    'message': 'Token authentication successful',
+                    'token': new_token
+                }))
+                authenticated = True
+                clients[websocket] = username
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] User authenticated via token: {username}")
             
             else:
                 await websocket.send_str(json.dumps({
@@ -683,7 +803,7 @@ async def handler(websocket):
         join_message = json.dumps({
             'type': 'system',
             'content': f'{username} joined the chat',
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         })
         await broadcast(join_message, exclude=websocket)
         print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} joined chat")
@@ -717,7 +837,7 @@ async def handler(websocket):
                             'type': 'message',
                             'username': username,
                             'content': msg_content,
-                            'timestamp': datetime.now().isoformat(),
+                            'timestamp': datetime.now(timezone.utc).isoformat(),
                             'context': context,
                             'context_id': context_id,
                             'avatar': user_profile.get('avatar', '👤') if user_profile else '👤',
@@ -1153,7 +1273,7 @@ async def handler(websocket):
                                     current_settings.get('announcement_message') != settings.get('announcement_message') or
                                     current_settings.get('announcement_duration_minutes') != settings.get('announcement_duration_minutes')):
                                     # Announcement was just enabled, message changed, or duration changed - reset timestamp
-                                    settings['announcement_set_at'] = datetime.now()
+                                    settings['announcement_set_at'] = datetime.now(timezone.utc)
                             elif not settings.get('announcement_enabled'):
                                 # Announcement disabled, clear timestamp
                                 settings['announcement_set_at'] = None
@@ -2193,7 +2313,7 @@ async def handler(websocket):
             leave_message = json.dumps({
                 'type': 'system',
                 'content': f'{username} left the chat',
-                'timestamp': datetime.now().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             })
             await broadcast(leave_message)
             print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} left")
