@@ -798,7 +798,7 @@ async def handler(websocket):
         })
         await websocket.send_str(user_data)
         
-        # Send announcement data
+        # Send announcement data and server settings
         admin_settings = db.get_admin_settings()
         set_at = admin_settings.get('announcement_set_at')
         announcement_data = {
@@ -806,7 +806,8 @@ async def handler(websocket):
             'enabled': admin_settings.get('announcement_enabled', False),
             'message': admin_settings.get('announcement_message', ''),
             'duration_minutes': admin_settings.get('announcement_duration_minutes', 60),
-            'set_at': set_at.isoformat() if set_at and hasattr(set_at, 'isoformat') else None
+            'set_at': set_at.isoformat() if set_at and hasattr(set_at, 'isoformat') else None,
+            'max_message_length': admin_settings.get('max_message_length', 2000)
         }
         await websocket.send_str(json.dumps(announcement_data))
         

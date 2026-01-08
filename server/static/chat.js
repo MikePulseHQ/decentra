@@ -767,6 +767,10 @@
             
             case 'announcement_update':
                 handleAnnouncementUpdate(data);
+                // Update max message length from server settings
+                if (data.max_message_length !== undefined) {
+                    maxMessageLength = data.max_message_length;
+                }
                 break;
             
             case 'admin_status':
