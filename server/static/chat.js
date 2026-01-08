@@ -3732,12 +3732,43 @@
             return;
         }
         
+        // Sanitize emoji image source values before using them in img.src
+        function sanitizeEmojiImageSrc(value) {
+            if (typeof value !== 'string') {
+                return '';
+            }
+            const trimmed = value.trim();
+            // Allow data URLs for images
+            if (trimmed.toLowerCase().startsWith('data:image/')) {
+                return trimmed;
+            }
+            // Allow same-origin relative paths, but not protocol-relative URLs
+            if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
+                return trimmed;
+            }
+            // For absolute URLs, only allow same-origin
+            try {
+                const url = new URL(trimmed, window.location.origin);
+                if (url.origin === window.location.origin) {
+                    return url.toString();
+                }
+            } catch (e) {
+                // Invalid URL, fall through to return empty
+            }
+            return '';
+        }
+        
         emojis.forEach(emoji => {
             const emojiItem = document.createElement('div');
             emojiItem.className = 'custom-emoji-item';
             
             const img = document.createElement('img');
-            img.src = emoji.image_data;
+            const safeSrc = sanitizeEmojiImageSrc(emoji.image_data);
+            if (safeSrc) {
+                img.src = safeSrc;
+            } else {
+                console.warn('Discarding unsafe emoji image source', emoji.image_data);
+            }
             img.alt = emoji.name;
             
             const nameDiv = document.createElement('div');
