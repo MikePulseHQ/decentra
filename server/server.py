@@ -2382,35 +2382,48 @@ async def handler(websocket):
                         emoji = data.get('emoji', '')
                         
                         if message_id and emoji:
-                            # Remove the reaction
+                            # Get the message first to verify existence and access
+                            message = db.get_message(message_id)
+                            if not message:
+                                # Message does not exist; do not reveal this to the client
+                                continue
+
+                            # For DMs, ensure the user is a participant in the DM thread
+                            dm_users = None
+                            if message.get('context_type') == 'dm' and message.get('context_id'):
+                                dm_users = db.get_user_dms(username)
+                                if not any(dm.get('dm_id') == message['context_id'] for dm in dm_users):
+                                    # User is not part of this DM; do not allow reaction removal
+                                    continue
+                            
+                            # Remove the reaction only after authorization checks
                             if db.remove_reaction(message_id, username, emoji):
-                                # Get message to determine context for broadcasting
-                                message = db.get_message(message_id)
-                                if message:
-                                    # Get all reactions for this message
-                                    reactions = db.get_message_reactions(message_id)
-                                    
-                                    reaction_update = {
-                                        'type': 'reaction_removed',
-                                        'message_id': message_id,
-                                        'reactions': reactions
-                                    }
-                                    
-                                    # Broadcast to appropriate context
-                                    if message['context_type'] == 'server' and message['context_id']:
-                                        server_id = message['context_id'].split('/')[0]
-                                        await broadcast_to_server(server_id, json.dumps(reaction_update))
-                                    elif message['context_type'] == 'dm' and message['context_id']:
-                                        # Get DM participants
+                                # Get all reactions for this message
+                                reactions = db.get_message_reactions(message_id)
+                                
+                                reaction_update = {
+                                    'type': 'reaction_removed',
+                                    'message_id': message_id,
+                                    'reactions': reactions
+                                }
+                                
+                                # Broadcast to appropriate context
+                                if message.get('context_type') == 'server' and message.get('context_id'):
+                                    server_id = message['context_id'].split('/')[0]
+                                    await broadcast_to_server(server_id, json.dumps(reaction_update))
+                                elif message.get('context_type') == 'dm' and message.get('context_id'):
+                                    # Get DM participants (reuse if already fetched)
+                                    if dm_users is None:
                                         dm_users = db.get_user_dms(username)
-                                        for dm in dm_users:
-                                            if dm['dm_id'] == message['context_id']:
-                                                participants = [dm['user1'], dm['user2']]
-                                                for participant in participants:
+                                    for dm in dm_users:
+                                        if dm.get('dm_id') == message['context_id']:
+                                            participants = [dm.get('user1'), dm.get('user2')]
+                                            for participant in participants:
+                                                if participant:
                                                     await send_to_user(participant, json.dumps(reaction_update))
-                                                break
-                                    
-                                    print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} removed reaction {emoji} from message {message_id}")
+                                            break
+                                
+                                print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} removed reaction {emoji} from message {message_id}")
                     
                     elif data.get('type') == 'start_voice_call':
                         # Direct voice call with a friend
