@@ -3734,7 +3734,7 @@
             customEmojis[currentContext.serverId].forEach(emoji => {
                 const btn = document.createElement('button');
                 const img = document.createElement('img');
-                img.src = emoji.image_data;
+                img.src = sanitizeImageSrc(emoji.image_data);
                 img.alt = emoji.name;
                 btn.appendChild(img);
                 btn.title = emoji.name;
