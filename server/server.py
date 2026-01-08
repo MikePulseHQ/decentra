@@ -1517,7 +1517,8 @@ async def handler(websocket):
                                     'enabled': settings.get('announcement_enabled', False),
                                     'message': settings.get('announcement_message', ''),
                                     'duration_minutes': settings.get('announcement_duration_minutes', 60),
-                                    'set_at': set_at.isoformat() if set_at and hasattr(set_at, 'isoformat') else None
+                                    'set_at': set_at.isoformat() if set_at and hasattr(set_at, 'isoformat') else None,
+                                    'max_message_length': settings.get('max_message_length', 2000)
                                 }
                                 
                                 for client_ws in clients.keys():
