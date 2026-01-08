@@ -2369,13 +2369,36 @@ async def handler(websocket):
                                     
                                     print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} added reaction {emoji} to message {message_id}")
                             else:
-                                # Reaction already exists - just return current reactions
-                                reactions = db.get_message_reactions(message_id)
-                                await websocket.send_str(json.dumps({
-                                    'type': 'reaction_added',
-                                    'message_id': message_id,
-                                    'reactions': reactions
-                                }))
+                                # Reaction already exists - broadcast current reactions to keep all clients in sync
+                                message = db.get_message(message_id)
+                                if message:
+                                    reactions = db.get_message_reactions(message_id)
+                                    reaction_update = {
+                                        'type': 'reaction_added',
+                                        'message_id': message_id,
+                                        'reactions': reactions
+                                    }
+                                    
+                                    # Broadcast to appropriate context, same as in the successful add branch
+                                    if message['context_type'] == 'server' and message['context_id']:
+                                        server_id = message['context_id'].split('/')[0]
+                                        await broadcast_to_server(server_id, json.dumps(reaction_update))
+                                    elif message['context_type'] == 'dm' and message['context_id']:
+                                        dm_users = db.get_user_dms(username)
+                                        for dm in dm_users:
+                                            if dm['dm_id'] == message['context_id']:
+                                                participants = [dm['user1'], dm['user2']]
+                                                for participant in participants:
+                                                    await send_to_user(participant, json.dumps(reaction_update))
+                                                break
+                                else:
+                                    # Fallback: if message context is unavailable, at least return current reactions to requester
+                                    reactions = db.get_message_reactions(message_id)
+                                    await websocket.send_str(json.dumps({
+                                        'type': 'reaction_added',
+                                        'message_id': message_id,
+                                        'reactions': reactions
+                                    }))
                     
                     elif data.get('type') == 'remove_reaction':
                         message_id = data.get('message_id')
