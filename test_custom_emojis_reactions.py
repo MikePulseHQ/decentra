@@ -185,6 +185,13 @@ def test_custom_emojis_and_reactions():
     assert emoji is None, "Deleted emoji still retrievable"
     print("✓ Deleted emoji is no longer retrievable")
     
+    # Verify reactions using deleted emoji still exist (graceful handling)
+    reactions = db.get_message_reactions(msg_id_1)
+    # The reaction with emoji_1 should still be in database but will need UI handling
+    custom_emoji_reactions = [r for r in reactions if r['emoji_type'] == 'custom']
+    assert len(custom_emoji_reactions) > 0, "Custom emoji reactions should still exist after emoji deletion"
+    print("✓ Reactions with deleted emoji gracefully handled (remain in database)")
+    
     # Test 10: Messages with reactions include reaction data
     print("\nTest 10: Testing message retrieval with reactions...")
     

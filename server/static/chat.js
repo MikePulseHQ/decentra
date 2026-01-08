@@ -3569,6 +3569,39 @@
         return div.innerHTML;
     }
     
+    // Sanitize image sources for custom emojis to prevent XSS
+    function sanitizeImageSrc(raw) {
+        if (typeof raw !== 'string') {
+            return null;
+        }
+        const value = raw.trim();
+        if (!value) {
+            return null;
+        }
+        // Allow data: URIs only for images
+        if (value.startsWith('data:')) {
+            // Basic check: data:[<mediatype>][;base64],...
+            const commaIndex = value.indexOf(',');
+            const header = commaIndex === -1 ? value : value.substring(0, commaIndex);
+            // header like "data:image/png;base64"
+            if (/^data:image\//i.test(header)) {
+                return value;
+            }
+            return null;
+        }
+        // Allow same-origin URLs only
+        try {
+            const url = new URL(value, window.location.origin);
+            if ((url.protocol === 'http:' || url.protocol === 'https:') && url.origin === window.location.origin) {
+                return url.href;
+            }
+            return null;
+        } catch (e) {
+            // Invalid URL
+            return null;
+        }
+    }
+    
     // ========== Custom Emoji and Reaction Functions ==========
     
     // Render reactions for a message
@@ -3605,41 +3638,7 @@
             emojiSpan.className = 'reaction-emoji';
             
             if (group.emoji_type === 'custom') {
-                // (Reaction rendering and emoji handling code appears below)
-
-                // Helper to sanitize image sources for custom emojis to prevent XSS
-                function sanitizeImageSrc(raw) {
-                    if (typeof raw !== 'string') {
-                        return null;
-                    }
-                    const value = raw.trim();
-                    if (!value) {
-                        return null;
-                    }
-                    // Allow data: URIs only for images
-                    if (value.startsWith('data:')) {
-                        // Basic check: data:[<mediatype>][;base64],...
-                        const commaIndex = value.indexOf(',');
-                        const header = commaIndex === -1 ? value : value.substring(0, commaIndex);
-                        // header like "data:image/png;base64"
-                        if (/^data:image\//i.test(header)) {
-                            return value;
-                        }
-                        return null;
-                    }
-                    try {
-                        const url = new URL(value, window.location.origin);
-                        if (url.protocol === 'http:' || url.protocol === 'https:') {
-                            return url.href;
-                        }
-                        return null;
-                    } catch (e) {
-                        // Invalid URL
-                        return null;
-                    }
-                }
-
-                // ... more code may exist between here and the reactionGroups loop ...
+                // Find custom emoji data
                 let emojiData = null;
                 for (const serverId in customEmojis) {
                     const emoji = customEmojis[serverId].find(e => e.emoji_id === group.emoji);
@@ -3772,38 +3771,12 @@
             return;
         }
         
-        // Sanitize emoji image source values before using them in img.src
-        function sanitizeEmojiImageSrc(value) {
-            if (typeof value !== 'string') {
-                return '';
-            }
-            const trimmed = value.trim();
-            // Allow data URLs for images
-            if (trimmed.toLowerCase().startsWith('data:image/')) {
-                return trimmed;
-            }
-            // Allow same-origin relative paths, but not protocol-relative URLs
-            if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
-                return trimmed;
-            }
-            // For absolute URLs, only allow same-origin
-            try {
-                const url = new URL(trimmed, window.location.origin);
-                if (url.origin === window.location.origin) {
-                    return url.toString();
-                }
-            } catch (e) {
-                // Invalid URL, fall through to return empty
-            }
-            return '';
-        }
-        
         emojis.forEach(emoji => {
             const emojiItem = document.createElement('div');
             emojiItem.className = 'custom-emoji-item';
             
             const img = document.createElement('img');
-            const safeSrc = sanitizeEmojiImageSrc(emoji.image_data);
+            const safeSrc = sanitizeImageSrc(emoji.image_data);
             if (safeSrc) {
                 img.src = safeSrc;
             } else {
