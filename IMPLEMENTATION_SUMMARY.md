@@ -51,7 +51,7 @@ Successfully implemented the Rich Embeds feature for the Decentra chat applicati
 - Added responsive mobile styles for all embed types
 
 ### Security Measures
-✓ **XSS Prevention** - All URLs properly escaped using `escapeHtml()`
+✓ **XSS Prevention** - Link display text escaped using `escapeHtml()`; `href` attribute values from `linkifyText` are not additionally sanitized, so avoid passing untrusted `javascript:` or other dangerous URLs
 ✓ **Link Security** - External links use `rel="noopener noreferrer"`
 ✓ **Error Handling** - Failed media loads fall back to plain links
 ✓ **No Security Vulnerabilities** - CodeQL analysis passed with 0 alerts
