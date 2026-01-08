@@ -1899,15 +1899,31 @@
         editForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const newContent = editInput.value.trim();
-            
-            if (newContent && newContent !== originalContent) {
+
+            // Prevent saving empty messages and keep the edit form open
+            if (!newContent) {
+                // Use built-in form validation messaging for feedback
+                if (editInput.setCustomValidity) {
+                    editInput.setCustomValidity('Message cannot be empty.');
+                    editInput.reportValidity && editInput.reportValidity();
+                } else {
+                    alert('Message cannot be empty.');
+                }
+                return;
+            }
+
+            // Clear any previous validation message
+            if (editInput.setCustomValidity) {
+                editInput.setCustomValidity('');
+            }
+
+            if (newContent !== originalContent) {
                 ws.send(JSON.stringify({
                     type: 'edit_message',
                     message_id: parseInt(messageId),
                     content: newContent
                 }));
             }
-            
             // Restore original content while waiting for server response
             const restoredContentDiv = document.createElement('div');
             restoredContentDiv.className = 'message-content';
