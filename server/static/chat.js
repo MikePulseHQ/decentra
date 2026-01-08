@@ -3418,6 +3418,27 @@
     }
     
     /**
+     * Sanitize a URL used in message embeds to allow only http/https.
+     * Returns a safe, normalized URL string or null if the URL is not allowed.
+     */
+    function sanitizeEmbedUrl(rawUrl) {
+        if (typeof rawUrl !== 'string') {
+            return null;
+        }
+        try {
+            const urlObj = new URL(rawUrl, window.location.origin);
+            const protocol = urlObj.protocol.toLowerCase();
+            if (protocol === 'http:' || protocol === 'https:') {
+                return urlObj.toString();
+            }
+            return null;
+        } catch (e) {
+            // Invalid URL
+            return null;
+        }
+    }
+    
+    /**
      * Create an image embed element
      */
     function createImageEmbed(url) {
@@ -3521,23 +3542,29 @@
                 return;
             }
             processedUrls.add(url);
+
+            // Sanitize the URL before creating any embeds
+            const safeUrl = sanitizeEmbedUrl(url);
+            if (!safeUrl) {
+                return;
+            }
             
             // Check for YouTube videos first
-            const youtubeId = getYouTubeVideoId(url);
+            const youtubeId = getYouTubeVideoId(safeUrl);
             if (youtubeId) {
-                embeds.push(createYouTubeEmbed(youtubeId, url));
+                embeds.push(createYouTubeEmbed(youtubeId, safeUrl));
             }
             // Check for images
-            else if (isImageUrl(url)) {
-                embeds.push(createImageEmbed(url));
+            else if (isImageUrl(safeUrl)) {
+                embeds.push(createImageEmbed(safeUrl));
             }
             // Check for videos
-            else if (isVideoUrl(url)) {
-                embeds.push(createVideoEmbed(url));
+            else if (isVideoUrl(safeUrl)) {
+                embeds.push(createVideoEmbed(safeUrl));
             }
             // Regular link
             else {
-                embeds.push(createLinkEmbed(url));
+                embeds.push(createLinkEmbed(safeUrl));
             }
         });
         
