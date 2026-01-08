@@ -3577,7 +3577,14 @@
     function linkifyText(text) {
         const escapedText = escapeHtml(text);
         return escapedText.replace(URL_REGEX, (url) => {
-            return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="message-link">${url}</a>`;
+            const safeUrl = sanitizeEmbedUrl(url);
+            // If the URL is not safe, render it as plain, already-escaped text
+            if (!safeUrl) {
+                return escapeHtml(url);
+            }
+            const escapedHref = escapeHtml(safeUrl);
+            const escapedLabel = escapeHtml(safeUrl);
+            return `<a href="${escapedHref}" target="_blank" rel="noopener noreferrer" class="message-link">${escapedLabel}</a>`;
         });
     }
     
