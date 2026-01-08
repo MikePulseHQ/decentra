@@ -1698,19 +1698,25 @@
             let canEditOthers = false;
             let canDeleteOthers = false;
             
-            if (!isOwnMessage && currentContext && currentContext.type === 'server') {
-                const server = servers.find(s => s.id === currentContext.serverId);
-                if (server) {
-                    // Server owner can edit/delete all messages
-                    if (server.owner === username) {
-                        canEditOthers = true;
-                        canDeleteOthers = true;
-                    } else if (server.permissions) {
-                        // Check member permissions
-                        canEditOthers = server.permissions.can_edit_messages || false;
-                        canDeleteOthers = server.permissions.can_delete_messages || false;
+            if (currentContext && currentContext.type === 'server') {
+                // For server messages, apply server-based permissions for other users' messages
+                if (!isOwnMessage) {
+                    const server = servers.find(s => s.id === currentContext.serverId);
+                    if (server) {
+                        // Server owner can edit/delete all messages
+                        if (server.owner === username) {
+                            canEditOthers = true;
+                            canDeleteOthers = true;
+                        } else if (server.permissions) {
+                            // Check member permissions
+                            canEditOthers = server.permissions.can_edit_messages || false;
+                            canDeleteOthers = server.permissions.can_delete_messages || false;
+                        }
                     }
                 }
+            } else {
+                // For DMs and other non-server contexts, users can only edit/delete their own messages.
+                // canEditOthers and canDeleteOthers remain false.
             }
             
             // Show edit/delete buttons for own messages or if user has permissions
