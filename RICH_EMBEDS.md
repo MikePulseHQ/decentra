@@ -103,7 +103,7 @@ All embed styles are defined in `/server/static/styles.css`:
 
 ## Security Considerations
 
-1. **XSS Prevention**: All URLs are properly escaped using `escapeHtml()` function
+1. **XSS Prevention**: User-supplied message text (including the clickable link text produced by `linkifyText()`) is escaped using the `escapeHtml()` function before being inserted into the DOM. URL values used in `href` and media `src` attributes are not modified by `escapeHtml()` and are used as provided to the client-side embed logic.
 2. **Link Safety**: All external links use `rel="noopener noreferrer"` to prevent tabnabbing
 3. **Lazy Loading**: Images use lazy loading to prevent resource exhaustion
 4. **Error Handling**: Failed media loads gracefully fall back to plain links
