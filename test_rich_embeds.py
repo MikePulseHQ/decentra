@@ -6,7 +6,6 @@ Tests the client-side JavaScript embed detection logic
 
 import os
 import sys
-import json
 
 def test_url_patterns():
     """Test URL pattern matching"""
