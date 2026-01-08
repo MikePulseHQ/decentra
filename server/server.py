@@ -992,8 +992,8 @@ async def handler(websocket):
                                 reactions_map = db.get_reactions_for_messages(message_ids)
                                 
                                 # Add reactions to each message
-                                for msg in dm_messages:
-                                    msg['reactions'] = reactions_map.get(msg['id'], [])
+                                for dm_msg in dm_messages:
+                                    dm_msg['reactions'] = reactions_map.get(dm_msg['id'], [])
                             
                             await websocket.send_str(json.dumps({
                                 'type': 'dm_history',
