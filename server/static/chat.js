@@ -493,6 +493,15 @@
                         notificationManager.setNotificationMode(data.notification_mode);
                     }
                 }
+                
+                // Handle admin status from init message
+                if (data.is_admin !== undefined) {
+                    if (data.is_admin) {
+                        menuAdminBtn.classList.remove('hidden');
+                    } else {
+                        menuAdminBtn.classList.add('hidden');
+                    }
+                }
                 break;
                 
             case 'history':
@@ -2241,6 +2250,17 @@
         const serverName = serverNameInput.value.trim();
         if (!serverName) return;
         
+        // Check if WebSocket is connected and authenticated
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            alert('Connection error. Please refresh the page and try again.');
+            return;
+        }
+        
+        if (!authenticated) {
+            alert('Please wait for authentication to complete before creating a server.');
+            return;
+        }
+        
         ws.send(JSON.stringify({
             type: 'create_server',
             name: serverName
@@ -2976,7 +2996,17 @@
     // Generate invite code (from menu)
     menuInviteBtn.addEventListener('click', () => {
         userMenu.classList.add('hidden');
-        if (!authenticated) return;
+        
+        // Check if WebSocket is connected and authenticated
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            alert('Connection error. Please refresh the page and try again.');
+            return;
+        }
+        
+        if (!authenticated) {
+            alert('Please wait for authentication to complete before generating an invite.');
+            return;
+        }
         
         ws.send(JSON.stringify({
             type: 'generate_invite'
@@ -3269,6 +3299,17 @@
             });
             e.target.classList.add('selected');
             
+            // Check if WebSocket is connected
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Connection error. Please refresh the page and try again.');
+                return;
+            }
+            
+            if (!authenticated) {
+                alert('Please wait for authentication to complete before changing your avatar.');
+                return;
+            }
+            
             // Send to server
             ws.send(JSON.stringify({
                 type: 'set_avatar',
@@ -3322,6 +3363,17 @@
     
     uploadAvatarBtn.addEventListener('click', () => {
         if (selectedAvatarFile) {
+            // Check if WebSocket is connected
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Connection error. Please refresh the page and try again.');
+                return;
+            }
+            
+            if (!authenticated) {
+                alert('Please wait for authentication to complete before uploading your avatar.');
+                return;
+            }
+            
             const reader = new FileReader();
             reader.onload = (e) => {
                 const base64Data = e.target.result;
@@ -3523,6 +3575,17 @@
     saveProfileBtn.addEventListener('click', () => {
         const bio = bioInput.value.trim();
         const statusMessage = statusMessageInput.value.trim();
+        
+        // Check if WebSocket is connected
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            alert('Connection error. Please refresh the page and try again.');
+            return;
+        }
+        
+        if (!authenticated) {
+            alert('Please wait for authentication to complete before updating your profile.');
+            return;
+        }
         
         // Send update to server
         ws.send(JSON.stringify({

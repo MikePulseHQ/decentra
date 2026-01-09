@@ -1304,6 +1304,13 @@ body::before {
 }
 
 /* Responsive Design */
+@media (max-width: 768px) and (pointer: coarse) {
+    /* Show mobile menu toggle only on touch devices with narrow viewports */
+    .mobile-menu-toggle {
+        display: block;
+    }
+}
+
 @media (max-width: 768px) {
     /* Prevent body scrolling on mobile */
     html {
@@ -1316,11 +1323,6 @@ body::before {
         height: 100%;
         max-height: 100%;
         overflow: hidden;
-    }
-    
-    /* Show mobile menu toggle buttons */
-    .mobile-menu-toggle {
-        display: block;
     }
     
     /* Hide sidebars by default on mobile */
