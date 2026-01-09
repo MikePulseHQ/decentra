@@ -784,12 +784,15 @@ async def handler(websocket):
         current_profile = get_profile_data(username)
         user = db.get_user(username)
         notification_mode = user.get('notification_mode', 'all') if user else 'all'
+        first_user = db.get_first_user()
+        is_admin = (username == first_user)
         user_data = json.dumps({
             'type': 'init',
             'username': username,
             **current_avatar,
             **current_profile,
             'notification_mode': notification_mode,
+            'is_admin': is_admin,
             'servers': user_servers,
             'dms': user_dms,
             'friends': friends_list,
