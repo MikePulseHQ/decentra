@@ -20,7 +20,7 @@ def test_admin_button_visibility():
     print(f"  First user: {first_user}")
     print(f"  Current user: {current_user}")
     print(f"  is_admin: {is_admin}")
-    assert is_admin == True, "First user should be admin"
+    assert is_admin, "First user should be admin"
     print("  ✓ PASS: First user is correctly identified as admin")
     
     # Test case 2: Second user should not be admin
@@ -30,7 +30,7 @@ def test_admin_button_visibility():
     print(f"  First user: {first_user}")
     print(f"  Current user: {current_user}")
     print(f"  is_admin: {is_admin}")
-    assert is_admin == False, "Second user should not be admin"
+    assert not is_admin, "Second user should not be admin"
     print("  ✓ PASS: Second user is correctly identified as non-admin")
     
     # Simulate the client-side logic
@@ -46,7 +46,7 @@ def test_admin_button_visibility():
         button_hidden = True   # Add hidden class
     print(f"  is_admin: {is_admin}")
     print(f"  button_hidden: {button_hidden}")
-    assert button_hidden == False, "Admin button should be visible for admin"
+    assert not button_hidden, "Admin button should be visible for admin"
     print("  ✓ PASS: Admin button is correctly shown for admin user")
     
     # Test case 4: Admin button should be hidden for non-admin
@@ -59,7 +59,7 @@ def test_admin_button_visibility():
         button_hidden = True   # Add hidden class
     print(f"  is_admin: {is_admin}")
     print(f"  button_hidden: {button_hidden}")
-    assert button_hidden == True, "Admin button should be hidden for non-admin"
+    assert button_hidden, "Admin button should be hidden for non-admin"
     print("  ✓ PASS: Admin button is correctly hidden for non-admin user")
     
     print("\n" + "=" * 60)
