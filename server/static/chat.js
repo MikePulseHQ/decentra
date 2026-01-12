@@ -279,7 +279,7 @@
     
     // Connect to WebSocket
     let reconnectAttempts = 0;
-    const maxReconnectAttempts = 10; // Cap reconnection attempts to prevent infinite growth
+    const maxReconnectAttempts = 10; // Cap the counter used for exponential backoff delay calculation
     const maxReconnectDelay = 30000; // Maximum 30 seconds between retries
     let isIntentionalClose = false; // Track if close was intentional (e.g., logout)
     
