@@ -312,7 +312,7 @@
             
             // Always attempt to reconnect, whether authenticated or not
             // Use exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (max)
-            // Cap at maxReconnectAttempts to prevent unbounded growth
+            // Compute the exponential backoff attempt number, capped so the delay cannot grow beyond maxReconnectDelay
             const attemptNum = Math.min(reconnectAttempts, maxReconnectAttempts);
             const delay = Math.min(1000 * Math.pow(2, attemptNum), maxReconnectDelay);
             
