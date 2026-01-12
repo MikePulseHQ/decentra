@@ -278,11 +278,17 @@
     }
     
     // Connect to WebSocket
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 10; // Cap the counter used for exponential backoff delay calculation
+    const maxReconnectDelay = 30000; // Maximum 30 seconds between retries
+    let isIntentionalClose = false; // Track if close was intentional (e.g., logout)
+    
     function connect() {
         ws = new WebSocket(wsUrl);
         
         ws.onopen = () => {
             console.log('WebSocket connected');
+            reconnectAttempts = 0; // Reset reconnect attempts on successful connection
             authenticate();
         };
         
@@ -293,15 +299,31 @@
         
         ws.onerror = (error) => {
             console.error('WebSocket error:', error);
-            appendSystemMessage('Connection error. Please refresh the page.');
         };
         
         ws.onclose = () => {
             console.log('WebSocket disconnected');
-            if (authenticated) {
-                appendSystemMessage('Disconnected from server. Attempting to reconnect...');
-                setTimeout(connect, 3000);
+            
+            // Don't reconnect if this was an intentional close (e.g., user logged out)
+            if (isIntentionalClose) {
+                isIntentionalClose = false;
+                return;
             }
+            
+            // Always attempt to reconnect, whether authenticated or not
+            // Use exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s (max)
+            // Compute the exponential backoff attempt number, capped so the delay cannot grow beyond maxReconnectDelay
+            const attemptNum = Math.min(reconnectAttempts, maxReconnectAttempts);
+            const delay = Math.min(1000 * Math.pow(2, attemptNum), maxReconnectDelay);
+            
+            // Cap reconnectAttempts to prevent unbounded growth
+            if (reconnectAttempts < maxReconnectAttempts) {
+                reconnectAttempts++;
+            }
+            
+            const delaySeconds = Math.round(delay / 1000);
+            appendSystemMessage(`Connection lost. Reconnecting in ${delaySeconds} second${delaySeconds !== 1 ? 's' : ''}...`);
+            setTimeout(connect, delay);
         };
     }
     
@@ -3121,6 +3143,7 @@
         
         sessionStorage.clear();
         if (ws) {
+            isIntentionalClose = true; // Mark this as an intentional close
             ws.close();
         }
         window.location.href = '/static/index.html';
