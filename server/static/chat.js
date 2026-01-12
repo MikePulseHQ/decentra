@@ -317,7 +317,8 @@
             const delay = Math.min(1000 * Math.pow(2, attemptNum), maxReconnectDelay);
             reconnectAttempts++;
             
-            appendSystemMessage(`Connection lost. Reconnecting in ${delay/1000} seconds...`);
+            const delaySeconds = Math.round(delay / 1000);
+            appendSystemMessage(`Connection lost. Reconnecting in ${delaySeconds} second${delaySeconds !== 1 ? 's' : ''}...`);
             setTimeout(connect, delay);
         };
     }
