@@ -174,6 +174,8 @@
                 reject(new Error('Authentication timeout'));
             }, 10000); // 10 second timeout
             
+            let authCompleted = false;
+            
             ws.onopen = () => {
                 // Send authentication request
                 const authData = {
@@ -197,31 +199,39 @@
             
             ws.onmessage = (event) => {
                 clearTimeout(timeout);
-                const data = JSON.parse(event.data);
+                authCompleted = true;
                 
-                if (data.type === 'auth_success') {
-                    // Store token and username for the chat page
-                    if (data.token) {
-                        sessionStorage.setItem('token', data.token);
-                    }
-                    sessionStorage.setItem('username', username);
+                try {
+                    const data = JSON.parse(event.data);
                     
-                    // Close WebSocket and redirect
+                    if (data.type === 'auth_success') {
+                        // Store token and username for the chat page
+                        if (data.token) {
+                            sessionStorage.setItem('token', data.token);
+                        }
+                        sessionStorage.setItem('username', username);
+                        
+                        // Close WebSocket and redirect
+                        ws.close();
+                        window.location.href = '/static/chat.html';
+                        resolve();
+                    } else if (data.type === 'auth_error') {
+                        ws.close();
+                        reject(new Error(data.message || 'Authentication failed'));
+                    } else if (data.type === 'verification_required') {
+                        // Email verification is required
+                        ws.close();
+                        // Store username for verification flow
+                        sessionStorage.setItem('pendingUsername', username);
+                        // Show verification mode
+                        switchToVerificationMode(username);
+                        showError(data.message + '. Please check your email and enter the verification code.');
+                        resolve(); // Resolve successfully since we're switching to verification mode
+                    }
+                } catch (error) {
+                    // Handle malformed JSON from server
                     ws.close();
-                    window.location.href = '/static/chat.html';
-                    resolve();
-                } else if (data.type === 'auth_error') {
-                    ws.close();
-                    reject(new Error(data.message || 'Authentication failed'));
-                } else if (data.type === 'verification_required') {
-                    // Email verification is required
-                    ws.close();
-                    // Store username for verification flow
-                    sessionStorage.setItem('pendingUsername', username);
-                    // Show verification mode
-                    switchToVerificationMode(username);
-                    showError(data.message + '. Please check your email and enter the verification code.');
-                    resolve(); // Resolve successfully since we're switching to verification mode
+                    reject(new Error('Invalid response from server'));
                 }
             };
             
@@ -233,8 +243,8 @@
             
             ws.onclose = (event) => {
                 clearTimeout(timeout);
-                // If connection closed without a response, reject
-                if (!event.wasClean) {
+                // Only reject if connection closed without completing authentication
+                if (!authCompleted && !event.wasClean) {
                     reject(new Error('Connection closed unexpectedly'));
                 }
             };
