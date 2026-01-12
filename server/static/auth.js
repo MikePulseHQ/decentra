@@ -199,12 +199,12 @@
             
             ws.onmessage = (event) => {
                 clearTimeout(timeout);
-                authCompleted = true;
                 
                 try {
                     const data = JSON.parse(event.data);
                     
                     if (data.type === 'auth_success') {
+                        authCompleted = true;
                         // Store token and username for the chat page
                         if (data.token) {
                             sessionStorage.setItem('token', data.token);
@@ -216,20 +216,33 @@
                         window.location.href = '/static/chat.html';
                         resolve();
                     } else if (data.type === 'auth_error') {
+                        authCompleted = true;
                         ws.close();
                         reject(new Error(data.message || 'Authentication failed'));
                     } else if (data.type === 'verification_required') {
+                        authCompleted = true;
                         // Email verification is required
                         ws.close();
                         // Store username for verification flow
                         sessionStorage.setItem('pendingUsername', username);
                         // Show verification mode
                         switchToVerificationMode(username);
-                        showError(data.message + '. Please check your email and enter the verification code.');
+                        const baseMessage = data.message || 'Verification required';
+                        const extraMessage = 'Please check your email and enter the verification code.';
+                        const fullMessage = /[.!?]$/.test(baseMessage)
+                            ? baseMessage + ' ' + extraMessage
+                            : baseMessage + '. ' + extraMessage;
+                        showError(fullMessage);
                         resolve(); // Resolve successfully since we're switching to verification mode
+                    } else {
+                        // Unexpected message type from server
+                        authCompleted = true;
+                        ws.close();
+                        reject(new Error('Unexpected response from server: ' + String(data.type)));
                     }
                 } catch (error) {
                     // Handle malformed JSON from server
+                    authCompleted = true;
                     ws.close();
                     reject(new Error('Invalid response from server'));
                 }

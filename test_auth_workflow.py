@@ -10,7 +10,6 @@ This test verifies that:
 import sys
 import os
 from datetime import datetime, timezone, timedelta
-import bcrypt
 
 # Set a fixed JWT secret key and encryption key for tests
 os.environ['JWT_SECRET_KEY'] = 'test-jwt-secret-key-for-auth-workflow-testing'
