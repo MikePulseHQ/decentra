@@ -786,6 +786,7 @@ async def handler(websocket):
         notification_mode = user.get('notification_mode', 'all') if user else 'all'
         first_user = db.get_first_user()
         is_admin = (username == first_user)
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Admin check for {username}: first_user={first_user}, is_admin={is_admin}")
         user_data = json.dumps({
             'type': 'init',
             'username': username,
@@ -1467,6 +1468,7 @@ async def handler(websocket):
                     elif data.get('type') == 'check_admin':
                         first_user = db.get_first_user()
                         is_admin = (username == first_user)
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] check_admin request from {username}: first_user={first_user}, is_admin={is_admin}")
                         
                         await websocket.send_str(json.dumps({
                             'type': 'admin_status',

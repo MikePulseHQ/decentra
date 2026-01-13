@@ -517,12 +517,17 @@
                 }
                 
                 // Handle admin status from init message
+                console.log('[DEBUG] Admin status from init message:', data.is_admin);
                 if (data.is_admin !== undefined) {
                     if (data.is_admin) {
+                        console.log('[DEBUG] Showing admin settings button');
                         menuAdminBtn.classList.remove('hidden');
                     } else {
+                        console.log('[DEBUG] Hiding admin settings button');
                         menuAdminBtn.classList.add('hidden');
                     }
+                } else {
+                    console.log('[DEBUG] Admin status undefined in init message');
                 }
                 break;
                 
@@ -829,9 +834,12 @@
             
             case 'admin_status':
                 // Show or hide admin settings menu item based on admin status
+                console.log('[DEBUG] Admin status from check_admin:', data.is_admin);
                 if (data.is_admin) {
+                    console.log('[DEBUG] Showing admin settings button');
                     menuAdminBtn.classList.remove('hidden');
                 } else {
+                    console.log('[DEBUG] Hiding admin settings button');
                     menuAdminBtn.classList.add('hidden');
                 }
                 break;
