@@ -787,6 +787,7 @@ async def handler(websocket):
         first_user = db.get_first_user()
         is_admin = (username == first_user)
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Admin check for {username}: first_user={first_user}, is_admin={is_admin}")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Debug: username='{username}' (type: {type(username).__name__}), first_user='{first_user}' (type: {type(first_user).__name__ if first_user else 'NoneType'})")
         user_data = json.dumps({
             'type': 'init',
             'username': username,
@@ -1469,6 +1470,7 @@ async def handler(websocket):
                         first_user = db.get_first_user()
                         is_admin = (username == first_user)
                         print(f"[{datetime.now().strftime('%H:%M:%S')}] check_admin request from {username}: first_user={first_user}, is_admin={is_admin}")
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Debug: username='{username}' (type: {type(username).__name__}), first_user='{first_user}' (type: {type(first_user).__name__ if first_user else 'NoneType'})")
                         
                         await websocket.send_str(json.dumps({
                             'type': 'admin_status',
