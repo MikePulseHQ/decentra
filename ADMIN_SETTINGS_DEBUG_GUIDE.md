@@ -17,7 +17,7 @@ I've added comprehensive logging to help diagnose the issue:
 
 ### Server-side logs (server/server.py):
 - Line 789: Logs the admin check when sending the init message
-- Line 1470: Logs the admin check when handling check_admin requests
+- Line 1471: Logs the admin check when handling check_admin requests
 
 ### Client-side logs (server/static/chat.js):
 - Lines 520-532: Logs admin status from init message
