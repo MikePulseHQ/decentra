@@ -20,7 +20,7 @@ I've added comprehensive logging to help diagnose the issue:
 - Line 1471: Logs the admin check when handling check_admin requests
 
 ### Client-side logs (server/static/chat.js):
-- Lines 520-532: Logs admin status from init message
+- Lines 521, 523, 526, and 530: Logs admin status from init message
 - Lines 833-842: Logs admin status from admin_status message
 
 ## How to Diagnose the Issue
