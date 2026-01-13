@@ -828,7 +828,7 @@
                 break;
             
             case 'admin_status':
-                // Show or hide admin config menu item based on admin status
+                // Show or hide admin settings menu item based on admin status
                 if (data.is_admin) {
                     menuAdminBtn.classList.remove('hidden');
                 } else {
@@ -3129,7 +3129,7 @@
     // Logout (from menu)
     menuLogoutBtn.addEventListener('click', logout);
     
-    // Admin config (from menu)
+    // Admin settings (from menu)
     menuAdminBtn.addEventListener('click', () => {
         window.location.href = '/static/adminconfig.html';
     });

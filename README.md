@@ -403,12 +403,12 @@ Any authenticated user can generate invite codes:
 
 ## Email Notifications (SMTP)
 
-Decentra supports sending email notifications for system events like user registration. The first user (admin) can configure SMTP settings through the Admin Configuration page.
+Decentra supports sending email notifications for system events like user registration. The first user (admin) can configure SMTP settings through the Admin Settings page.
 
 ### Setting up SMTP
 
 1. Log in as the first user (admin)
-2. Navigate to Admin Configuration (accessible from the chat interface)
+2. Navigate to Admin Settings (accessible from the user menu in the chat interface)
 3. Scroll to the "Email & SMTP Settings" section
 4. Configure your SMTP server settings:
    - Enable email notifications
