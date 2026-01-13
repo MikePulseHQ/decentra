@@ -129,6 +129,27 @@ def generate_jwt_token(username):
     return token
 
 
+def log_admin_check(username, first_user, is_admin, context=""):
+    """Log admin status check with detailed type and value information.
+    
+    Args:
+        username: Current username being checked
+        first_user: The first user (admin) username from database
+        is_admin: Boolean result of admin check
+        context: Optional context string (e.g., "init message" or "check_admin")
+    """
+    prefix = f"[{datetime.now().strftime('%H:%M:%S')}]"
+    context_str = f" ({context})" if context else ""
+    print(f"{prefix} Admin check for {username}{context_str}: first_user={first_user}, is_admin={is_admin}")
+    
+    # Log detailed type and value information for debugging
+    username_type = type(username).__name__
+    first_user_type = type(first_user).__name__ if first_user else 'NoneType'
+    print(f"{prefix} Debug{context_str}: username='{username}' (type: {username_type}), "
+          f"first_user='{first_user}' (type: {first_user_type})")
+
+
+
 def verify_jwt_token(token):
     """Verify a JWT token and return the username if valid."""
     try:
@@ -786,8 +807,7 @@ async def handler(websocket):
         notification_mode = user.get('notification_mode', 'all') if user else 'all'
         first_user = db.get_first_user()
         is_admin = (username == first_user)
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Admin check for {username}: first_user={first_user}, is_admin={is_admin}")
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Debug: username='{username}' (type: {type(username).__name__}), first_user='{first_user}' (type: {type(first_user).__name__ if first_user else 'NoneType'})")
+        log_admin_check(username, first_user, is_admin, context="init message")
         user_data = json.dumps({
             'type': 'init',
             'username': username,
@@ -1469,8 +1489,7 @@ async def handler(websocket):
                     elif data.get('type') == 'check_admin':
                         first_user = db.get_first_user()
                         is_admin = (username == first_user)
-                        print(f"[{datetime.now().strftime('%H:%M:%S')}] check_admin request from {username}: first_user={first_user}, is_admin={is_admin}")
-                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Debug: username='{username}' (type: {type(username).__name__}), first_user='{first_user}' (type: {type(first_user).__name__ if first_user else 'NoneType'})")
+                        log_admin_check(username, first_user, is_admin, context="check_admin request")
                         
                         await websocket.send_str(json.dumps({
                             'type': 'admin_status',

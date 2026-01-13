@@ -79,7 +79,7 @@
     const menuFriendsBtn = document.getElementById('menu-friends-btn');
     const searchUsersBtn = document.getElementById('search-users-btn');
     const menuAdminBtn = document.getElementById('menu-admin-btn');
-    console.log('[DEBUG] Admin button element found:', menuAdminBtn !== null, menuAdminBtn);
+    console.log('[DEBUG] Admin button element found:', menuAdminBtn !== null);
     
     // Modal elements
     const inviteModal = document.getElementById('invite-modal');
