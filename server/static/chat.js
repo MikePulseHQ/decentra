@@ -79,6 +79,7 @@
     const menuFriendsBtn = document.getElementById('menu-friends-btn');
     const searchUsersBtn = document.getElementById('search-users-btn');
     const menuAdminBtn = document.getElementById('menu-admin-btn');
+    console.log('[DEBUG] Admin button element found:', menuAdminBtn !== null);
     
     // Modal elements
     const inviteModal = document.getElementById('invite-modal');
@@ -519,12 +520,16 @@
                 // Handle admin status from init message
                 if (data.is_admin !== undefined) {
                     console.log('[DEBUG] Admin status from init message:', data.is_admin);
-                    if (data.is_admin) {
-                        console.log('[DEBUG] Showing admin settings button');
-                        menuAdminBtn.classList.remove('hidden');
+                    if (menuAdminBtn) {
+                        if (data.is_admin) {
+                            console.log('[DEBUG] Showing admin settings button');
+                            menuAdminBtn.classList.remove('hidden');
+                        } else {
+                            console.log('[DEBUG] Hiding admin settings button');
+                            menuAdminBtn.classList.add('hidden');
+                        }
                     } else {
-                        console.log('[DEBUG] Hiding admin settings button');
-                        menuAdminBtn.classList.add('hidden');
+                        console.error('[ERROR] Admin settings button element not found!');
                     }
                 } else {
                     console.log('[DEBUG] Admin status undefined in init message');
@@ -835,12 +840,16 @@
             case 'admin_status':
                 // Show or hide admin settings menu item based on admin status
                 console.log('[DEBUG] Admin status from check_admin:', data.is_admin);
-                if (data.is_admin) {
-                    console.log('[DEBUG] Showing admin settings button');
-                    menuAdminBtn.classList.remove('hidden');
+                if (menuAdminBtn) {
+                    if (data.is_admin) {
+                        console.log('[DEBUG] Showing admin settings button');
+                        menuAdminBtn.classList.remove('hidden');
+                    } else {
+                        console.log('[DEBUG] Hiding admin settings button');
+                        menuAdminBtn.classList.add('hidden');
+                    }
                 } else {
-                    console.log('[DEBUG] Hiding admin settings button');
-                    menuAdminBtn.classList.add('hidden');
+                    console.error('[ERROR] Admin settings button element not found!');
                 }
                 break;
                 
@@ -3138,9 +3147,11 @@
     menuLogoutBtn.addEventListener('click', logout);
     
     // Admin settings (from menu)
-    menuAdminBtn.addEventListener('click', () => {
-        window.location.href = '/static/adminconfig.html';
-    });
+    if (menuAdminBtn) {
+        menuAdminBtn.addEventListener('click', () => {
+            window.location.href = '/static/adminconfig.html';
+        });
+    }
     
     function logout() {
         // Clean up voice chat
