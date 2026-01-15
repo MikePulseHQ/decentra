@@ -162,7 +162,7 @@ Rather than guessing, this solution:
 
 - `server/static/chat.js` - Added null checks and error handling
 - `server/server.py` - Added logging helper function and enhanced diagnostics
-- `ADMIN_MENU_FIX_GUIDE.md` - New comprehensive debugging guide (this file)
+- `ADMIN_MENU_FIX_GUIDE.md` - New comprehensive debugging guide (see separate guide)
 
 ## Backward Compatibility
 
