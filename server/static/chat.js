@@ -3231,19 +3231,58 @@
     // Admin save settings handler
     if (adminSaveSettingsBtn) {
         adminSaveSettingsBtn.addEventListener('click', () => {
+            // Parse and validate numeric fields
+            const maxMessageLength = parseInt(document.getElementById('admin-max-message-length').value, 10);
+            const maxFileSize = parseInt(document.getElementById('admin-max-file-size').value, 10);
+            const maxServersPerUser = parseInt(document.getElementById('admin-max-servers-per-user').value, 10);
+            const maxChannelsPerServer = parseInt(document.getElementById('admin-max-channels-per-server').value, 10);
+            const smtpPort = parseInt(document.getElementById('admin-smtp-port').value, 10);
+            const announcementDuration = parseInt(document.getElementById('admin-announcement-duration').value, 10);
+            
+            // Validate all numeric fields
+            if (isNaN(maxMessageLength) || maxMessageLength < 100 || maxMessageLength > 10000) {
+                showAdminStatus('Maximum message length must be between 100 and 10000 characters.', 'error');
+                return;
+            }
+            
+            if (isNaN(maxFileSize) || maxFileSize < 1 || maxFileSize > 100) {
+                showAdminStatus('Maximum file size must be between 1 and 100 MB.', 'error');
+                return;
+            }
+            
+            if (isNaN(maxServersPerUser) || maxServersPerUser < 0 || maxServersPerUser > 100) {
+                showAdminStatus('Max servers per user must be between 0 and 100.', 'error');
+                return;
+            }
+            
+            if (isNaN(maxChannelsPerServer) || maxChannelsPerServer < 0 || maxChannelsPerServer > 500) {
+                showAdminStatus('Max channels per server must be between 0 and 500.', 'error');
+                return;
+            }
+            
+            if (isNaN(smtpPort) || smtpPort < 1 || smtpPort > 65535) {
+                showAdminStatus('SMTP port must be between 1 and 65535.', 'error');
+                return;
+            }
+            
+            if (isNaN(announcementDuration) || announcementDuration < 1 || announcementDuration > 10080) {
+                showAdminStatus('Announcement duration must be between 1 and 10080 minutes (7 days).', 'error');
+                return;
+            }
+            
             const settings = {
                 server_name: document.getElementById('admin-server-name').value,
-                max_message_length: parseInt(document.getElementById('admin-max-message-length').value, 10),
+                max_message_length: maxMessageLength,
                 allow_registration: document.getElementById('admin-allow-registrations').checked,
                 require_invite: document.getElementById('admin-require-invite').checked,
-                max_file_size_mb: parseInt(document.getElementById('admin-max-file-size').value, 10),
-                max_servers_per_user: parseInt(document.getElementById('admin-max-servers-per-user').value, 10),
-                max_channels_per_server: parseInt(document.getElementById('admin-max-channels-per-server').value, 10),
+                max_file_size_mb: maxFileSize,
+                max_servers_per_user: maxServersPerUser,
+                max_channels_per_server: maxChannelsPerServer,
                 // SMTP settings
                 require_email_verification: document.getElementById('admin-require-email-verification').checked,
                 smtp_enabled: document.getElementById('admin-smtp-enabled').checked,
                 smtp_host: document.getElementById('admin-smtp-host').value,
-                smtp_port: parseInt(document.getElementById('admin-smtp-port').value, 10),
+                smtp_port: smtpPort,
                 smtp_username: document.getElementById('admin-smtp-username').value,
                 smtp_password: document.getElementById('admin-smtp-password').value,
                 smtp_from_email: document.getElementById('admin-smtp-from-email').value,
@@ -3252,19 +3291,8 @@
                 // Announcements
                 announcement_enabled: document.getElementById('admin-announcement-enabled').checked,
                 announcement_message: document.getElementById('admin-announcement-message').value,
-                announcement_duration_minutes: parseInt(document.getElementById('admin-announcement-duration').value, 10)
+                announcement_duration_minutes: announcementDuration
             };
-            
-            // Validate announcement duration
-            if (isNaN(settings.announcement_duration_minutes)) {
-                showAdminStatus('Please enter a valid numeric value for announcement duration in minutes.', 'error');
-                return;
-            }
-            
-            if (settings.announcement_duration_minutes < 1 || settings.announcement_duration_minutes > 10080) {
-                showAdminStatus('Announcement duration must be between 1 and 10080 minutes (7 days)', 'error');
-                return;
-            }
             
             ws.send(JSON.stringify({
                 type: 'save_admin_settings',
@@ -3276,10 +3304,18 @@
     // Admin test SMTP handler
     if (adminTestSmtpBtn) {
         adminTestSmtpBtn.addEventListener('click', () => {
+            const port = parseInt(document.getElementById('admin-smtp-port').value, 10);
+            
+            // Validate port first
+            if (isNaN(port) || port < 1 || port > 65535) {
+                showAdminSmtpTestResult(false, 'SMTP port must be a valid number between 1 and 65535');
+                return;
+            }
+            
             const smtpSettings = {
                 smtp_enabled: document.getElementById('admin-smtp-enabled').checked,
                 smtp_host: document.getElementById('admin-smtp-host').value,
-                smtp_port: parseInt(document.getElementById('admin-smtp-port').value, 10),
+                smtp_port: port,
                 smtp_username: document.getElementById('admin-smtp-username').value,
                 smtp_password: document.getElementById('admin-smtp-password').value,
                 smtp_from_email: document.getElementById('admin-smtp-from-email').value,
@@ -3295,11 +3331,6 @@
                 }
                 if (!smtpSettings.smtp_from_email) {
                     showAdminSmtpTestResult(false, 'From Email Address is required when email notifications are enabled');
-                    return;
-                }
-                const port = smtpSettings.smtp_port;
-                if (!Number.isInteger(port) || port < 1 || port > 65535) {
-                    showAdminSmtpTestResult(false, 'Valid SMTP Port (1-65535) is required');
                     return;
                 }
             }
