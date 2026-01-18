@@ -1,5 +1,5 @@
-# Pin to specific digest to avoid cache corruption issues
-FROM python:3.11-slim@sha256:1dd3dca85e22886e44fcad1bb7ccab6691dfa83db52214cf9e20696e095f3e36
+# Use latest python:3.11-slim for better compatibility
+FROM python:3.11-slim
 
 WORKDIR /app
 
