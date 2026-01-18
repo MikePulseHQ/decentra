@@ -782,8 +782,12 @@
                 break;
                 
             case 'error':
+                // Show error in admin settings modal if it's open
+                if (adminSettingsModal && !adminSettingsModal.classList.contains('hidden')) {
+                    showAdminStatus(data.message, 'error');
+                }
                 // Show error in join server modal if it's open
-                if (!joinServerModal.classList.contains('hidden')) {
+                else if (!joinServerModal.classList.contains('hidden')) {
                     joinServerError.textContent = data.message;
                     joinServerError.classList.remove('hidden');
                 } else {
