@@ -3352,7 +3352,7 @@
     
     // Helper functions for admin settings
     function loadAdminSettings(settings) {
-        if (!settings) return;
+        if (!settings || typeof settings !== 'object') return;
         
         document.getElementById('admin-server-name').value = settings.server_name || 'Decentra Chat';
         document.getElementById('admin-max-message-length').value = settings.max_message_length || 2000;
@@ -3381,6 +3381,8 @@
     
     function showAdminStatus(message, type) {
         const statusEl = document.getElementById('admin-status-message');
+        if (!statusEl) return;
+        
         statusEl.textContent = message;
         statusEl.className = `status-message ${type}`;
         statusEl.style.display = 'block';
@@ -3392,6 +3394,8 @@
     
     function showAdminSmtpTestResult(success, message) {
         const resultEl = document.getElementById('admin-smtp-test-result');
+        if (!resultEl) return;
+        
         resultEl.textContent = message;
         resultEl.className = success ? 'status-message success' : 'status-message error';
         resultEl.style.display = 'block';
