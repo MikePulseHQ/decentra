@@ -178,6 +178,12 @@
     const screenShareSettingsModal = document.getElementById('screen-share-settings-modal');
     const screenResolutionSelect = document.getElementById('screen-resolution-select');
     const screenFramerateSelect = document.getElementById('screen-framerate-select');
+    
+    // Admin settings modal elements
+    const adminSettingsModal = document.getElementById('admin-settings-modal');
+    const adminCloseModalBtn = document.getElementById('admin-close-modal-btn');
+    const adminSaveSettingsBtn = document.getElementById('admin-save-settings-btn');
+    const adminTestSmtpBtn = document.getElementById('admin-test-smtp-btn');
     const startScreenShareBtn = document.getElementById('start-screen-share-btn');
     const cancelScreenShareBtn = document.getElementById('cancel-screen-share-btn');
     
@@ -776,8 +782,20 @@
                 break;
                 
             case 'error':
+                // Show error in admin settings modal if it's open
+                if (adminSettingsModal && !adminSettingsModal.classList.contains('hidden')) {
+                    const statusEl = document.getElementById('admin-status-message');
+                    if (statusEl) {
+                        statusEl.textContent = data.message;
+                        statusEl.className = 'status-message error';
+                        statusEl.style.display = 'block';
+                        setTimeout(() => {
+                            statusEl.style.display = 'none';
+                        }, 5000);
+                    }
+                }
                 // Show error in join server modal if it's open
-                if (!joinServerModal.classList.contains('hidden')) {
+                else if (!joinServerModal.classList.contains('hidden')) {
                     joinServerError.textContent = data.message;
                     joinServerError.classList.remove('hidden');
                 } else {
@@ -851,6 +869,21 @@
                 } else {
                     console.error('[ERROR] Admin settings button element not found!');
                 }
+                break;
+            
+            case 'admin_settings':
+                // Load admin settings into the modal
+                loadAdminSettings(data.settings);
+                break;
+            
+            case 'settings_saved':
+                // Show success message when settings are saved
+                showAdminStatus('Settings saved successfully!', 'success');
+                break;
+            
+            case 'smtp_test_result':
+                // Show SMTP test result
+                showAdminSmtpTestResult(data.success, data.message);
                 break;
                 
             // Channel creation messages
@@ -3149,8 +3182,364 @@
     // Admin settings (from menu)
     if (menuAdminBtn) {
         menuAdminBtn.addEventListener('click', () => {
-            window.location.href = '/static/adminconfig.html';
+            // Show admin settings modal instead of navigating
+            if (!adminSettingsModal) {
+                console.error('Admin settings modal element not found');
+                return;
+            }
+            adminSettingsModal.classList.remove('hidden');
+            // Request admin settings from server
+            ws.send(JSON.stringify({
+                type: 'get_admin_settings'
+            }));
         });
+    }
+    
+    // Admin settings modal handlers
+    if (adminCloseModalBtn) {
+        adminCloseModalBtn.addEventListener('click', () => {
+            if (adminSettingsModal) {
+                adminSettingsModal.classList.add('hidden');
+            }
+        });
+    }
+    
+    // Close admin modal on outside click
+    if (adminSettingsModal) {
+        adminSettingsModal.addEventListener('click', (e) => {
+            if (e.target === adminSettingsModal) {
+                adminSettingsModal.classList.add('hidden');
+            }
+        });
+        
+        // Admin settings tab switching
+        const adminTabs = adminSettingsModal.querySelectorAll('.settings-tab');
+        const adminTabContents = {
+            'general': document.getElementById('admin-general-tab'),
+            'smtp': document.getElementById('admin-smtp-tab'),
+            'announcements': document.getElementById('admin-announcements-tab')
+        };
+        
+        adminTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.getAttribute('data-tab');
+                
+                // Update active tab and ARIA attributes
+                adminTabs.forEach(t => {
+                    t.classList.remove('active');
+                    t.setAttribute('aria-selected', 'false');
+                });
+                tab.classList.add('active');
+                tab.setAttribute('aria-selected', 'true');
+                
+                // Show corresponding content
+                Object.keys(adminTabContents).forEach(key => {
+                    const contentEl = adminTabContents[key];
+                    if (!contentEl) {
+                        return;
+                    }
+                    if (key === tabName) {
+                        contentEl.classList.remove('hidden');
+                        contentEl.classList.add('active');
+                    } else {
+                        contentEl.classList.add('hidden');
+                        contentEl.classList.remove('active');
+                    }
+                });
+            });
+        });
+    }
+    
+    // Admin save settings handler
+    if (adminSaveSettingsBtn) {
+        adminSaveSettingsBtn.addEventListener('click', () => {
+            // Helper function to validate numeric fields
+            function validateNumericField(value, min, max, errorMessage) {
+                if (isNaN(value) || value < min || value > max) {
+                    showAdminStatus(errorMessage, 'error');
+                    return false;
+                }
+                return true;
+            }
+            
+            // Parse and validate numeric fields
+            const maxMessageLength = parseInt(document.getElementById('admin-max-message-length').value, 10);
+            const maxFileSize = parseInt(document.getElementById('admin-max-file-size').value, 10);
+            const maxServersPerUser = parseInt(document.getElementById('admin-max-servers-per-user').value, 10);
+            const maxChannelsPerServer = parseInt(document.getElementById('admin-max-channels-per-server').value, 10);
+            const smtpPort = parseInt(document.getElementById('admin-smtp-port').value, 10);
+            const announcementDuration = parseInt(document.getElementById('admin-announcement-duration').value, 10);
+            
+            // Validate all numeric fields
+            if (!validateNumericField(maxMessageLength, 100, 10000, 'Maximum message length must be between 100 and 10000 characters.')) {
+                return;
+            }
+            
+            if (!validateNumericField(maxFileSize, 1, 100, 'Maximum file size must be between 1 and 100 MB.')) {
+                return;
+            }
+            
+            if (!validateNumericField(maxServersPerUser, 0, 100, 'Max servers per user must be between 0 and 100.')) {
+                return;
+            }
+            
+            if (!validateNumericField(maxChannelsPerServer, 0, 500, 'Max channels per server must be between 0 and 500.')) {
+                return;
+            }
+            
+            if (!validateNumericField(smtpPort, 1, 65535, 'SMTP port must be between 1 and 65535.')) {
+                return;
+            }
+            
+            if (!validateNumericField(announcementDuration, 1, 10080, 'Announcement duration must be between 1 and 10080 minutes (7 days).')) {
+                return;
+            }
+            
+            // Retrieve and validate all required DOM elements before accessing their properties
+            const serverNameInput = document.getElementById('admin-server-name');
+            const allowRegistrationsInput = document.getElementById('admin-allow-registrations');
+            const requireInviteInput = document.getElementById('admin-require-invite');
+            const requireEmailVerificationInput = document.getElementById('admin-require-email-verification');
+            const smtpEnabledInput = document.getElementById('admin-smtp-enabled');
+            const smtpHostInput = document.getElementById('admin-smtp-host');
+            const smtpUsernameInput = document.getElementById('admin-smtp-username');
+            const smtpPasswordInput = document.getElementById('admin-smtp-password');
+            const smtpFromEmailInput = document.getElementById('admin-smtp-from-email');
+            const smtpFromNameInput = document.getElementById('admin-smtp-from-name');
+            const smtpUseTlsInput = document.getElementById('admin-smtp-use-tls');
+            const announcementEnabledInput = document.getElementById('admin-announcement-enabled');
+            const announcementMessageInput = document.getElementById('admin-announcement-message');
+
+            if (
+                !serverNameInput ||
+                !allowRegistrationsInput ||
+                !requireInviteInput ||
+                !requireEmailVerificationInput ||
+                !smtpEnabledInput ||
+                !smtpHostInput ||
+                !smtpUsernameInput ||
+                !smtpPasswordInput ||
+                !smtpFromEmailInput ||
+                !smtpFromNameInput ||
+                !smtpUseTlsInput ||
+                !announcementEnabledInput ||
+                !announcementMessageInput
+            ) {
+                console.error('One or more admin settings elements are missing from the DOM.');
+                showAdminStatus('Unable to save settings because some form fields are missing. Please reload the page and try again.', 'error');
+                return;
+            }
+
+            const settings = {
+                server_name: serverNameInput.value,
+                max_message_length: maxMessageLength,
+                allow_registration: allowRegistrationsInput.checked,
+                require_invite: requireInviteInput.checked,
+                max_file_size_mb: maxFileSize,
+                max_servers_per_user: maxServersPerUser,
+                max_channels_per_server: maxChannelsPerServer,
+                // SMTP settings
+                require_email_verification: requireEmailVerificationInput.checked,
+                smtp_enabled: smtpEnabledInput.checked,
+                smtp_host: smtpHostInput.value,
+                smtp_port: smtpPort,
+                smtp_username: smtpUsernameInput.value,
+                smtp_password: smtpPasswordInput.value,
+                smtp_from_email: smtpFromEmailInput.value,
+                smtp_from_name: smtpFromNameInput.value,
+                smtp_use_tls: smtpUseTlsInput.checked,
+                // Announcements
+                announcement_enabled: announcementEnabledInput.checked,
+                announcement_message: announcementMessageInput.value,
+                announcement_duration_minutes: announcementDuration
+            };
+            
+            ws.send(JSON.stringify({
+                type: 'save_admin_settings',
+                settings: settings
+            }));
+        });
+    }
+    
+    // Admin test SMTP handler
+    if (adminTestSmtpBtn) {
+        adminTestSmtpBtn.addEventListener('click', () => {
+            const smtpPortEl = document.getElementById('admin-smtp-port');
+            const smtpEnabledEl = document.getElementById('admin-smtp-enabled');
+            const smtpHostEl = document.getElementById('admin-smtp-host');
+            const smtpUsernameEl = document.getElementById('admin-smtp-username');
+            const smtpPasswordEl = document.getElementById('admin-smtp-password');
+            const smtpFromEmailEl = document.getElementById('admin-smtp-from-email');
+            const smtpFromNameEl = document.getElementById('admin-smtp-from-name');
+            const smtpUseTlsEl = document.getElementById('admin-smtp-use-tls');
+            
+            if (!smtpPortEl || !smtpEnabledEl || !smtpHostEl || !smtpUsernameEl || 
+                !smtpPasswordEl || !smtpFromEmailEl || !smtpFromNameEl || !smtpUseTlsEl) {
+                showAdminSmtpTestResult(false, 'Unable to test SMTP: some form fields are missing. Please reload the page.');
+                return;
+            }
+            
+            const port = parseInt(smtpPortEl.value, 10);
+            
+            // Validate port first
+            if (isNaN(port) || port < 1 || port > 65535) {
+                showAdminSmtpTestResult(false, 'SMTP port must be a valid number between 1 and 65535');
+                return;
+            }
+            
+            const smtpSettings = {
+                smtp_enabled: smtpEnabledEl.checked,
+                smtp_host: smtpHostEl.value,
+                smtp_port: port,
+                smtp_username: smtpUsernameEl.value,
+                smtp_password: smtpPasswordEl.value,
+                smtp_from_email: smtpFromEmailEl.value,
+                smtp_from_name: smtpFromNameEl.value,
+                smtp_use_tls: smtpUseTlsEl.checked
+            };
+            
+            // Validate SMTP settings if enabled
+            if (smtpSettings.smtp_enabled) {
+                if (!smtpSettings.smtp_host) {
+                    showAdminSmtpTestResult(false, 'SMTP Host is required when email notifications are enabled');
+                    return;
+                }
+                if (!smtpSettings.smtp_from_email) {
+                    showAdminSmtpTestResult(false, 'From Email Address is required when email notifications are enabled');
+                    return;
+                }
+            }
+            
+            ws.send(JSON.stringify({
+                type: 'test_smtp',
+                settings: smtpSettings
+            }));
+        });
+    }
+    
+    // Helper functions for admin settings
+    function loadAdminSettings(settings) {
+        if (!settings || typeof settings !== 'object') return;
+        
+        const serverNameEl = document.getElementById('admin-server-name');
+        if (serverNameEl) {
+            serverNameEl.value = settings.server_name || 'Decentra Chat';
+        }
+        
+        const maxMessageLengthEl = document.getElementById('admin-max-message-length');
+        if (maxMessageLengthEl) {
+            maxMessageLengthEl.value = settings.max_message_length || 2000;
+        }
+        
+        const allowRegistrationsEl = document.getElementById('admin-allow-registrations');
+        if (allowRegistrationsEl) {
+            allowRegistrationsEl.checked = settings.allow_registration !== false;
+        }
+        
+        const requireInviteEl = document.getElementById('admin-require-invite');
+        if (requireInviteEl) {
+            requireInviteEl.checked = settings.require_invite !== false;
+        }
+        
+        const maxFileSizeEl = document.getElementById('admin-max-file-size');
+        if (maxFileSizeEl) {
+            maxFileSizeEl.value = settings.max_file_size_mb || 10;
+        }
+        
+        const maxServersPerUserEl = document.getElementById('admin-max-servers-per-user');
+        if (maxServersPerUserEl) {
+            maxServersPerUserEl.value = settings.max_servers_per_user || 0;
+        }
+        
+        const maxChannelsPerServerEl = document.getElementById('admin-max-channels-per-server');
+        if (maxChannelsPerServerEl) {
+            maxChannelsPerServerEl.value = settings.max_channels_per_server || 0;
+        }
+        
+        // Load SMTP settings
+        const requireEmailVerificationEl = document.getElementById('admin-require-email-verification');
+        if (requireEmailVerificationEl) {
+            requireEmailVerificationEl.checked = settings.require_email_verification !== false;
+        }
+        
+        const smtpEnabledEl = document.getElementById('admin-smtp-enabled');
+        if (smtpEnabledEl) {
+            smtpEnabledEl.checked = settings.smtp_enabled !== false;
+        }
+        
+        const smtpHostEl = document.getElementById('admin-smtp-host');
+        if (smtpHostEl) {
+            smtpHostEl.value = settings.smtp_host || '';
+        }
+        
+        const smtpPortEl = document.getElementById('admin-smtp-port');
+        if (smtpPortEl) {
+            smtpPortEl.value = settings.smtp_port || 587;
+        }
+        
+        const smtpUsernameEl = document.getElementById('admin-smtp-username');
+        if (smtpUsernameEl) {
+            smtpUsernameEl.value = settings.smtp_username || '';
+        }
+        
+        const smtpPasswordEl = document.getElementById('admin-smtp-password');
+        if (smtpPasswordEl) {
+            smtpPasswordEl.value = settings.smtp_password || '';
+        }
+        
+        const smtpFromEmailEl = document.getElementById('admin-smtp-from-email');
+        if (smtpFromEmailEl) {
+            smtpFromEmailEl.value = settings.smtp_from_email || '';
+        }
+        
+        const smtpFromNameEl = document.getElementById('admin-smtp-from-name');
+        if (smtpFromNameEl) {
+            smtpFromNameEl.value = settings.smtp_from_name || 'Decentra';
+        }
+        
+        const smtpUseTlsEl = document.getElementById('admin-smtp-use-tls');
+        if (smtpUseTlsEl) {
+            smtpUseTlsEl.checked = settings.smtp_use_tls !== false;
+        }
+        
+        // Load announcement settings
+        const announcementEnabledEl = document.getElementById('admin-announcement-enabled');
+        if (announcementEnabledEl) {
+            announcementEnabledEl.checked = settings.announcement_enabled !== false;
+        }
+        
+        const announcementMessageEl = document.getElementById('admin-announcement-message');
+        if (announcementMessageEl) {
+            announcementMessageEl.value = settings.announcement_message || '';
+        }
+        
+        const announcementDurationEl = document.getElementById('admin-announcement-duration');
+        if (announcementDurationEl) {
+            announcementDurationEl.value = settings.announcement_duration_minutes || 60;
+        }
+    }
+    
+    function showStatusMessage(elementId, message, className) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        
+        el.textContent = message;
+        el.className = className;
+        el.style.display = 'block';
+        
+        setTimeout(() => {
+            el.style.display = 'none';
+        }, 5000);
+    }
+    
+    function showAdminStatus(message, type) {
+        const className = `status-message ${type}`;
+        showStatusMessage('admin-status-message', message, className);
+    }
+    
+    function showAdminSmtpTestResult(success, message) {
+        const className = success ? 'status-message success' : 'status-message error';
+        showStatusMessage('admin-smtp-test-result', message, className);
     }
     
     function logout() {
