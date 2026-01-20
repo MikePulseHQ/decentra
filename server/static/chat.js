@@ -3257,28 +3257,31 @@
                 return;
             }
             
-            if (isNaN(maxFileSize) || maxFileSize < 1 || maxFileSize > 100) {
-                showAdminStatus('Maximum file size must be between 1 and 100 MB.', 'error');
+            function validateNumericField(value, min, max, errorMessage) {
+                if (isNaN(value) || value < min || value > max) {
+                    showAdminStatus(errorMessage, 'error');
+                    return false;
+                }
+                return true;
+            }
+            
+            if (!validateNumericField(maxFileSize, 1, 100, 'Maximum file size must be between 1 and 100 MB.')) {
                 return;
             }
             
-            if (isNaN(maxServersPerUser) || maxServersPerUser < 0 || maxServersPerUser > 100) {
-                showAdminStatus('Max servers per user must be between 0 and 100.', 'error');
+            if (!validateNumericField(maxServersPerUser, 0, 100, 'Max servers per user must be between 0 and 100.')) {
                 return;
             }
             
-            if (isNaN(maxChannelsPerServer) || maxChannelsPerServer < 0 || maxChannelsPerServer > 500) {
-                showAdminStatus('Max channels per server must be between 0 and 500.', 'error');
+            if (!validateNumericField(maxChannelsPerServer, 0, 500, 'Max channels per server must be between 0 and 500.')) {
                 return;
             }
             
-            if (isNaN(smtpPort) || smtpPort < 1 || smtpPort > 65535) {
-                showAdminStatus('SMTP port must be between 1 and 65535.', 'error');
+            if (!validateNumericField(smtpPort, 1, 65535, 'SMTP port must be between 1 and 65535.')) {
                 return;
             }
             
-            if (isNaN(announcementDuration) || announcementDuration < 1 || announcementDuration > 10080) {
-                showAdminStatus('Announcement duration must be between 1 and 10080 minutes (7 days).', 'error');
+            if (!validateNumericField(announcementDuration, 1, 10080, 'Announcement duration must be between 1 and 10080 minutes (7 days).')) {
                 return;
             }
             
