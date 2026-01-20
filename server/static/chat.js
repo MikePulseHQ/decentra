@@ -3393,29 +3393,102 @@
     function loadAdminSettings(settings) {
         if (!settings || typeof settings !== 'object') return;
         
-        document.getElementById('admin-server-name').value = settings.server_name || 'Decentra Chat';
-        document.getElementById('admin-max-message-length').value = settings.max_message_length || 2000;
-        document.getElementById('admin-allow-registrations').checked = settings.allow_registration !== false;
-        document.getElementById('admin-require-invite').checked = settings.require_invite !== false;
-        document.getElementById('admin-max-file-size').value = settings.max_file_size_mb || 10;
-        document.getElementById('admin-max-servers-per-user').value = settings.max_servers_per_user || 0;
-        document.getElementById('admin-max-channels-per-server').value = settings.max_channels_per_server || 0;
+        const serverNameEl = document.getElementById('admin-server-name');
+        if (serverNameEl) {
+            serverNameEl.value = settings.server_name || 'Decentra Chat';
+        }
+        
+        const maxMessageLengthEl = document.getElementById('admin-max-message-length');
+        if (maxMessageLengthEl) {
+            maxMessageLengthEl.value = settings.max_message_length || 2000;
+        }
+        
+        const allowRegistrationsEl = document.getElementById('admin-allow-registrations');
+        if (allowRegistrationsEl) {
+            allowRegistrationsEl.checked = settings.allow_registration !== false;
+        }
+        
+        const requireInviteEl = document.getElementById('admin-require-invite');
+        if (requireInviteEl) {
+            requireInviteEl.checked = settings.require_invite !== false;
+        }
+        
+        const maxFileSizeEl = document.getElementById('admin-max-file-size');
+        if (maxFileSizeEl) {
+            maxFileSizeEl.value = settings.max_file_size_mb || 10;
+        }
+        
+        const maxServersPerUserEl = document.getElementById('admin-max-servers-per-user');
+        if (maxServersPerUserEl) {
+            maxServersPerUserEl.value = settings.max_servers_per_user || 0;
+        }
+        
+        const maxChannelsPerServerEl = document.getElementById('admin-max-channels-per-server');
+        if (maxChannelsPerServerEl) {
+            maxChannelsPerServerEl.value = settings.max_channels_per_server || 0;
+        }
         
         // Load SMTP settings
-        document.getElementById('admin-require-email-verification').checked = settings.require_email_verification || false;
-        document.getElementById('admin-smtp-enabled').checked = settings.smtp_enabled || false;
-        document.getElementById('admin-smtp-host').value = settings.smtp_host || '';
-        document.getElementById('admin-smtp-port').value = settings.smtp_port || 587;
-        document.getElementById('admin-smtp-username').value = settings.smtp_username || '';
-        document.getElementById('admin-smtp-password').value = settings.smtp_password || '';
-        document.getElementById('admin-smtp-from-email').value = settings.smtp_from_email || '';
-        document.getElementById('admin-smtp-from-name').value = settings.smtp_from_name || 'Decentra';
-        document.getElementById('admin-smtp-use-tls').checked = settings.smtp_use_tls !== false;
+        const requireEmailVerificationEl = document.getElementById('admin-require-email-verification');
+        if (requireEmailVerificationEl) {
+            requireEmailVerificationEl.checked = settings.require_email_verification || false;
+        }
+        
+        const smtpEnabledEl = document.getElementById('admin-smtp-enabled');
+        if (smtpEnabledEl) {
+            smtpEnabledEl.checked = settings.smtp_enabled || false;
+        }
+        
+        const smtpHostEl = document.getElementById('admin-smtp-host');
+        if (smtpHostEl) {
+            smtpHostEl.value = settings.smtp_host || '';
+        }
+        
+        const smtpPortEl = document.getElementById('admin-smtp-port');
+        if (smtpPortEl) {
+            smtpPortEl.value = settings.smtp_port || 587;
+        }
+        
+        const smtpUsernameEl = document.getElementById('admin-smtp-username');
+        if (smtpUsernameEl) {
+            smtpUsernameEl.value = settings.smtp_username || '';
+        }
+        
+        const smtpPasswordEl = document.getElementById('admin-smtp-password');
+        if (smtpPasswordEl) {
+            smtpPasswordEl.value = settings.smtp_password || '';
+        }
+        
+        const smtpFromEmailEl = document.getElementById('admin-smtp-from-email');
+        if (smtpFromEmailEl) {
+            smtpFromEmailEl.value = settings.smtp_from_email || '';
+        }
+        
+        const smtpFromNameEl = document.getElementById('admin-smtp-from-name');
+        if (smtpFromNameEl) {
+            smtpFromNameEl.value = settings.smtp_from_name || 'Decentra';
+        }
+        
+        const smtpUseTlsEl = document.getElementById('admin-smtp-use-tls');
+        if (smtpUseTlsEl) {
+            smtpUseTlsEl.checked = settings.smtp_use_tls !== false;
+        }
         
         // Load announcement settings
-        document.getElementById('admin-announcement-enabled').checked = settings.announcement_enabled || false;
-        document.getElementById('admin-announcement-message').value = settings.announcement_message || '';
-        document.getElementById('admin-announcement-duration').value = settings.announcement_duration_minutes || 60;
+        const announcementEnabledEl = document.getElementById('admin-announcement-enabled');
+        if (announcementEnabledEl) {
+            announcementEnabledEl.checked = settings.announcement_enabled || false;
+        }
+        
+        const announcementMessageEl = document.getElementById('admin-announcement-message');
+        if (announcementMessageEl) {
+            announcementMessageEl.value = settings.announcement_message || '';
+        }
+        
+        const announcementDurationEl = document.getElementById('admin-announcement-duration');
+        if (announcementDurationEl) {
+            announcementDurationEl.value = settings.announcement_duration_minutes || 60;
+        }
     }
     
     function showAdminStatus(message, type) {
