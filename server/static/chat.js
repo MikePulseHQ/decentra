@@ -583,13 +583,33 @@
                 console.log('Current context:', currentContext);
                 console.log('Is for current context:', isMessageForCurrentContext(data));
                 
-                // If this is our own message and has an ID, upload queued attachments
-                if (data.username === username && data.id && data.messageKey) {
-                    const attachments = attachmentUploadQueue.get(data.messageKey);
+                // If this is our own message and has an ID, upload queued attachments.
+                // Prefer matching by messageKey, but fall back to a single pending entry
+                // if the server did not echo messageKey back.
+                if (data.username === username && data.id) {
+                    let attachments = null;
+                    let keyToDelete = null;
+
+                    if (data.messageKey) {
+                        attachments = attachmentUploadQueue.get(data.messageKey) || null;
+                        if (attachments) {
+                            keyToDelete = data.messageKey;
+                        }
+                    } else if (attachmentUploadQueue && attachmentUploadQueue.size === 1) {
+                        // Fallback: if there is exactly one pending attachment set, assume it
+                        // belongs to this message. This avoids leaking the queue when the
+                        // server does not return messageKey.
+                        const [entryKey, entryAttachments] = attachmentUploadQueue.entries().next().value;
+                        attachments = entryAttachments || null;
+                        keyToDelete = entryKey;
+                    }
+
                     if (attachments && attachments.length > 0) {
                         console.log('Uploading attachments for message:', data.id);
                         uploadAttachmentsForMessage(data.id, attachments);
-                        attachmentUploadQueue.delete(data.messageKey);
+                        if (keyToDelete !== null) {
+                            attachmentUploadQueue.delete(keyToDelete);
+                        }
                     }
                 }
                 
