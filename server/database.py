@@ -1218,7 +1218,7 @@ class Database:
             cursor = conn.cursor()
             cursor.execute('''
                 DELETE FROM message_attachments
-                WHERE uploaded_at < NOW() - INTERVAL '%s days'
+                WHERE uploaded_at < NOW() - make_interval(days => %s)
             ''', (days,))
             return cursor.rowcount
     
