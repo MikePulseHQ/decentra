@@ -2204,11 +2204,12 @@
             removeBtn.className = 'attachment-item-remove';
             removeBtn.textContent = '×';
             removeBtn.type = 'button';
-            removeBtn.dataset.fileIndex = index; // Store index for reference
-            removeBtn.onclick = (e) => {
-                const idx = parseInt(e.target.dataset.fileIndex);
-                pendingAttachments.splice(idx, 1);
-                updateAttachmentPreview();
+            removeBtn.onclick = () => {
+                const idx = pendingAttachments.indexOf(file);
+                if (idx !== -1) {
+                    pendingAttachments.splice(idx, 1);
+                    updateAttachmentPreview();
+                }
             };
             
             item.appendChild(icon);
