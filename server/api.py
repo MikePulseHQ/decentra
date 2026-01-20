@@ -7,11 +7,35 @@ Provides HTTP REST API for future desktop application integration
 import json
 import uuid
 import base64
+import re
 from aiohttp import web
 import bcrypt
 
 # Database instance will be set by setup_api_routes
 db = None
+
+
+def sanitize_filename(filename):
+    """Sanitize filename for safe use in headers."""
+    # Remove any path separators and control characters
+    filename = filename.replace('\\', '').replace('/', '').replace('\r', '').replace('\n', '')
+    # Keep only safe characters
+    filename = re.sub(r'[^\w\s\-\.]', '', filename)
+    # Limit length safely for UTF-8 (encode, truncate bytes, decode)
+    if len(filename.encode('utf-8')) > 255:
+        # Truncate at byte level and decode, ignoring errors
+        filename = filename.encode('utf-8')[:255].decode('utf-8', errors='ignore')
+    return filename or 'download'
+
+
+def sanitize_content_type(content_type):
+    """Sanitize content type to prevent header injection."""
+    # Remove newlines and control characters
+    content_type = content_type.replace('\r', '').replace('\n', '')
+    # Validate against common MIME types or default to safe value
+    if not re.match(r'^[a-zA-Z0-9\-\+\.]+/[a-zA-Z0-9\-\+\.]+$', content_type):
+        return 'application/octet-stream'
+    return content_type
 
 
 def verify_password(password, password_hash):
@@ -424,12 +448,16 @@ async def api_download_attachment(request):
         # Decode base64 file data
         file_data = base64.b64decode(attachment['file_data'])
         
+        # Sanitize headers to prevent injection
+        safe_content_type = sanitize_content_type(attachment['content_type'])
+        safe_filename = sanitize_filename(attachment['filename'])
+        
         # Return file with appropriate headers
         return web.Response(
             body=file_data,
-            content_type=attachment['content_type'],
+            content_type=safe_content_type,
             headers={
-                'Content-Disposition': f'attachment; filename="{attachment["filename"]}"',
+                'Content-Disposition': f'attachment; filename="{safe_filename}"',
                 'Content-Length': str(len(file_data))
             }
         )
@@ -466,8 +494,17 @@ async def api_get_message_attachments(request):
                 'error': 'Message ID is required'
             }, status=400)
         
+        # Validate message_id is numeric
+        try:
+            message_id_int = int(message_id)
+        except (ValueError, TypeError):
+            return web.json_response({
+                'success': False,
+                'error': 'Invalid message ID format'
+            }, status=400)
+        
         # Get attachments (without file data)
-        attachments = db.get_message_attachments(int(message_id))
+        attachments = db.get_message_attachments(message_id_int)
         
         return web.json_response({
             'success': True,

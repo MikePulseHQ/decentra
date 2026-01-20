@@ -2023,6 +2023,12 @@
         return /^[a-zA-Z0-9_-]+$/.test(idStr);
     }
     
+    // Sanitize filename for safe use in download attribute
+    function sanitizeFilename(filename) {
+        // Remove control characters and path separators
+        return String(filename).replace(/[\x00-\x1F\x7F\/\\]/g, '').substring(0, 255) || 'download';
+    }
+    
     // Load and display attachments for a message
     async function loadMessageAttachments(messageId, container) {
         const safeMessageId = String(messageId);
@@ -2040,10 +2046,19 @@
                 attachmentsDiv.className = 'message-attachments';
                 
                 for (const attachment of result.attachments) {
+                    // Validate attachment_id to prevent XSS
+                    const attachmentId = String(attachment.attachment_id);
+                    if (!isValidMessageId(attachmentId)) {
+                        console.warn('Skipping attachment with invalid ID:', attachmentId);
+                        continue;
+                    }
+                    
                     const attachmentLink = document.createElement('a');
                     attachmentLink.className = 'message-attachment';
-                    attachmentLink.href = `/api/download-attachment/${attachment.attachment_id}`;
-                    attachmentLink.download = attachment.filename;
+                    attachmentLink.href = `/api/download-attachment/${encodeURIComponent(attachmentId)}`;
+                    
+                    // Sanitize filename for download attribute
+                    attachmentLink.download = sanitizeFilename(attachment.filename);
                     
                     attachmentLink.innerHTML = `
                         <span class="message-attachment-icon">📎</span>
@@ -2105,7 +2120,8 @@
         console.log('Sending message:', msgData);
         
         // Store attachments in queue before sending (to avoid race conditions)
-        const messageKey = `${Date.now()}_${message}`;
+        // Use timestamp + random component + message for uniqueness
+        const messageKey = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${message}`;
         if (pendingAttachments.length > 0) {
             attachmentUploadQueue.set(messageKey, [...pendingAttachments]);
             console.log(`Queued ${pendingAttachments.length} attachments for message`);
