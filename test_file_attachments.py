@@ -7,7 +7,6 @@ import unittest
 import sys
 import os
 import base64
-from datetime import datetime
 
 # Add server directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'server'))
