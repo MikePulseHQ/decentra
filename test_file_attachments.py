@@ -31,8 +31,9 @@ class TestFileAttachments(unittest.TestCase):
         self.test_username = 'testuser_attachments'
         try:
             self.db.create_user(self.test_username, 'password123')
-        except:
-            pass  # User might already exist
+        except Exception:
+            # User might already exist; ignore standard application-level errors
+            pass
         
         # Create a test message
         self.message_id = self.db.save_message(
