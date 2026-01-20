@@ -3183,6 +3183,10 @@
     if (menuAdminBtn) {
         menuAdminBtn.addEventListener('click', () => {
             // Show admin settings modal instead of navigating
+            if (!adminSettingsModal) {
+                console.error('Admin settings modal element not found');
+                return;
+            }
             adminSettingsModal.classList.remove('hidden');
             // Request admin settings from server
             ws.send(JSON.stringify({
@@ -3194,7 +3198,9 @@
     // Admin settings modal handlers
     if (adminCloseModalBtn) {
         adminCloseModalBtn.addEventListener('click', () => {
-            adminSettingsModal.classList.add('hidden');
+            if (adminSettingsModal) {
+                adminSettingsModal.classList.add('hidden');
+            }
         });
     }
     
@@ -3218,18 +3224,26 @@
             tab.addEventListener('click', () => {
                 const tabName = tab.getAttribute('data-tab');
                 
-                // Update active tab
-                adminTabs.forEach(t => t.classList.remove('active'));
+                // Update active tab and ARIA attributes
+                adminTabs.forEach(t => {
+                    t.classList.remove('active');
+                    t.setAttribute('aria-selected', 'false');
+                });
                 tab.classList.add('active');
+                tab.setAttribute('aria-selected', 'true');
                 
                 // Show corresponding content
                 Object.keys(adminTabContents).forEach(key => {
+                    const contentEl = adminTabContents[key];
+                    if (!contentEl) {
+                        return;
+                    }
                     if (key === tabName) {
-                        adminTabContents[key].style.display = 'block';
-                        adminTabContents[key].classList.add('active');
+                        contentEl.classList.remove('hidden');
+                        contentEl.classList.add('active');
                     } else {
-                        adminTabContents[key].style.display = 'none';
-                        adminTabContents[key].classList.remove('active');
+                        contentEl.classList.add('hidden');
+                        contentEl.classList.remove('active');
                     }
                 });
             });
@@ -3239,6 +3253,15 @@
     // Admin save settings handler
     if (adminSaveSettingsBtn) {
         adminSaveSettingsBtn.addEventListener('click', () => {
+            // Helper function to validate numeric fields
+            function validateNumericField(value, min, max, errorMessage) {
+                if (isNaN(value) || value < min || value > max) {
+                    showAdminStatus(errorMessage, 'error');
+                    return false;
+                }
+                return true;
+            }
+            
             // Parse and validate numeric fields
             const maxMessageLength = parseInt(document.getElementById('admin-max-message-length').value, 10);
             const maxFileSize = parseInt(document.getElementById('admin-max-file-size').value, 10);
@@ -3248,33 +3271,27 @@
             const announcementDuration = parseInt(document.getElementById('admin-announcement-duration').value, 10);
             
             // Validate all numeric fields
-            if (isNaN(maxMessageLength) || maxMessageLength < 100 || maxMessageLength > 10000) {
-                showAdminStatus('Maximum message length must be between 100 and 10000 characters.', 'error');
+            if (!validateNumericField(maxMessageLength, 100, 10000, 'Maximum message length must be between 100 and 10000 characters.')) {
                 return;
             }
             
-            if (isNaN(maxFileSize) || maxFileSize < 1 || maxFileSize > 100) {
-                showAdminStatus('Maximum file size must be between 1 and 100 MB.', 'error');
+            if (!validateNumericField(maxFileSize, 1, 100, 'Maximum file size must be between 1 and 100 MB.')) {
                 return;
             }
             
-            if (isNaN(maxServersPerUser) || maxServersPerUser < 0 || maxServersPerUser > 100) {
-                showAdminStatus('Max servers per user must be between 0 and 100.', 'error');
+            if (!validateNumericField(maxServersPerUser, 0, 100, 'Max servers per user must be between 0 and 100.')) {
                 return;
             }
             
-            if (isNaN(maxChannelsPerServer) || maxChannelsPerServer < 0 || maxChannelsPerServer > 500) {
-                showAdminStatus('Max channels per server must be between 0 and 500.', 'error');
+            if (!validateNumericField(maxChannelsPerServer, 0, 500, 'Max channels per server must be between 0 and 500.')) {
                 return;
             }
             
-            if (isNaN(smtpPort) || smtpPort < 1 || smtpPort > 65535) {
-                showAdminStatus('SMTP port must be between 1 and 65535.', 'error');
+            if (!validateNumericField(smtpPort, 1, 65535, 'SMTP port must be between 1 and 65535.')) {
                 return;
             }
             
-            if (isNaN(announcementDuration) || announcementDuration < 1 || announcementDuration > 10080) {
-                showAdminStatus('Announcement duration must be between 1 and 10080 minutes (7 days).', 'error');
+            if (!validateNumericField(announcementDuration, 1, 10080, 'Announcement duration must be between 1 and 10080 minutes (7 days).')) {
                 return;
             }
             
@@ -3347,7 +3364,22 @@
     // Admin test SMTP handler
     if (adminTestSmtpBtn) {
         adminTestSmtpBtn.addEventListener('click', () => {
-            const port = parseInt(document.getElementById('admin-smtp-port').value, 10);
+            const smtpPortEl = document.getElementById('admin-smtp-port');
+            const smtpEnabledEl = document.getElementById('admin-smtp-enabled');
+            const smtpHostEl = document.getElementById('admin-smtp-host');
+            const smtpUsernameEl = document.getElementById('admin-smtp-username');
+            const smtpPasswordEl = document.getElementById('admin-smtp-password');
+            const smtpFromEmailEl = document.getElementById('admin-smtp-from-email');
+            const smtpFromNameEl = document.getElementById('admin-smtp-from-name');
+            const smtpUseTlsEl = document.getElementById('admin-smtp-use-tls');
+            
+            if (!smtpPortEl || !smtpEnabledEl || !smtpHostEl || !smtpUsernameEl || 
+                !smtpPasswordEl || !smtpFromEmailEl || !smtpFromNameEl || !smtpUseTlsEl) {
+                showAdminSmtpTestResult(false, 'Unable to test SMTP: some form fields are missing. Please reload the page.');
+                return;
+            }
+            
+            const port = parseInt(smtpPortEl.value, 10);
             
             // Validate port first
             if (isNaN(port) || port < 1 || port > 65535) {
@@ -3356,14 +3388,14 @@
             }
             
             const smtpSettings = {
-                smtp_enabled: document.getElementById('admin-smtp-enabled').checked,
-                smtp_host: document.getElementById('admin-smtp-host').value,
+                smtp_enabled: smtpEnabledEl.checked,
+                smtp_host: smtpHostEl.value,
                 smtp_port: port,
-                smtp_username: document.getElementById('admin-smtp-username').value,
-                smtp_password: document.getElementById('admin-smtp-password').value,
-                smtp_from_email: document.getElementById('admin-smtp-from-email').value,
-                smtp_from_name: document.getElementById('admin-smtp-from-name').value,
-                smtp_use_tls: document.getElementById('admin-smtp-use-tls').checked
+                smtp_username: smtpUsernameEl.value,
+                smtp_password: smtpPasswordEl.value,
+                smtp_from_email: smtpFromEmailEl.value,
+                smtp_from_name: smtpFromNameEl.value,
+                smtp_use_tls: smtpUseTlsEl.checked
             };
             
             // Validate SMTP settings if enabled
@@ -3389,55 +3421,125 @@
     function loadAdminSettings(settings) {
         if (!settings || typeof settings !== 'object') return;
         
-        document.getElementById('admin-server-name').value = settings.server_name || 'Decentra Chat';
-        document.getElementById('admin-max-message-length').value = settings.max_message_length || 2000;
-        document.getElementById('admin-allow-registrations').checked = settings.allow_registration !== false;
-        document.getElementById('admin-require-invite').checked = settings.require_invite !== false;
-        document.getElementById('admin-max-file-size').value = settings.max_file_size_mb || 10;
-        document.getElementById('admin-max-servers-per-user').value = settings.max_servers_per_user || 0;
-        document.getElementById('admin-max-channels-per-server').value = settings.max_channels_per_server || 0;
+        const serverNameEl = document.getElementById('admin-server-name');
+        if (serverNameEl) {
+            serverNameEl.value = settings.server_name || 'Decentra Chat';
+        }
+        
+        const maxMessageLengthEl = document.getElementById('admin-max-message-length');
+        if (maxMessageLengthEl) {
+            maxMessageLengthEl.value = settings.max_message_length || 2000;
+        }
+        
+        const allowRegistrationsEl = document.getElementById('admin-allow-registrations');
+        if (allowRegistrationsEl) {
+            allowRegistrationsEl.checked = settings.allow_registration !== false;
+        }
+        
+        const requireInviteEl = document.getElementById('admin-require-invite');
+        if (requireInviteEl) {
+            requireInviteEl.checked = settings.require_invite !== false;
+        }
+        
+        const maxFileSizeEl = document.getElementById('admin-max-file-size');
+        if (maxFileSizeEl) {
+            maxFileSizeEl.value = settings.max_file_size_mb || 10;
+        }
+        
+        const maxServersPerUserEl = document.getElementById('admin-max-servers-per-user');
+        if (maxServersPerUserEl) {
+            maxServersPerUserEl.value = settings.max_servers_per_user || 0;
+        }
+        
+        const maxChannelsPerServerEl = document.getElementById('admin-max-channels-per-server');
+        if (maxChannelsPerServerEl) {
+            maxChannelsPerServerEl.value = settings.max_channels_per_server || 0;
+        }
         
         // Load SMTP settings
-        document.getElementById('admin-require-email-verification').checked = settings.require_email_verification || false;
-        document.getElementById('admin-smtp-enabled').checked = settings.smtp_enabled || false;
-        document.getElementById('admin-smtp-host').value = settings.smtp_host || '';
-        document.getElementById('admin-smtp-port').value = settings.smtp_port || 587;
-        document.getElementById('admin-smtp-username').value = settings.smtp_username || '';
-        document.getElementById('admin-smtp-password').value = settings.smtp_password || '';
-        document.getElementById('admin-smtp-from-email').value = settings.smtp_from_email || '';
-        document.getElementById('admin-smtp-from-name').value = settings.smtp_from_name || 'Decentra';
-        document.getElementById('admin-smtp-use-tls').checked = settings.smtp_use_tls !== false;
+        const requireEmailVerificationEl = document.getElementById('admin-require-email-verification');
+        if (requireEmailVerificationEl) {
+            requireEmailVerificationEl.checked = settings.require_email_verification !== false;
+        }
+        
+        const smtpEnabledEl = document.getElementById('admin-smtp-enabled');
+        if (smtpEnabledEl) {
+            smtpEnabledEl.checked = settings.smtp_enabled !== false;
+        }
+        
+        const smtpHostEl = document.getElementById('admin-smtp-host');
+        if (smtpHostEl) {
+            smtpHostEl.value = settings.smtp_host || '';
+        }
+        
+        const smtpPortEl = document.getElementById('admin-smtp-port');
+        if (smtpPortEl) {
+            smtpPortEl.value = settings.smtp_port || 587;
+        }
+        
+        const smtpUsernameEl = document.getElementById('admin-smtp-username');
+        if (smtpUsernameEl) {
+            smtpUsernameEl.value = settings.smtp_username || '';
+        }
+        
+        const smtpPasswordEl = document.getElementById('admin-smtp-password');
+        if (smtpPasswordEl) {
+            smtpPasswordEl.value = settings.smtp_password || '';
+        }
+        
+        const smtpFromEmailEl = document.getElementById('admin-smtp-from-email');
+        if (smtpFromEmailEl) {
+            smtpFromEmailEl.value = settings.smtp_from_email || '';
+        }
+        
+        const smtpFromNameEl = document.getElementById('admin-smtp-from-name');
+        if (smtpFromNameEl) {
+            smtpFromNameEl.value = settings.smtp_from_name || 'Decentra';
+        }
+        
+        const smtpUseTlsEl = document.getElementById('admin-smtp-use-tls');
+        if (smtpUseTlsEl) {
+            smtpUseTlsEl.checked = settings.smtp_use_tls !== false;
+        }
         
         // Load announcement settings
-        document.getElementById('admin-announcement-enabled').checked = settings.announcement_enabled || false;
-        document.getElementById('admin-announcement-message').value = settings.announcement_message || '';
-        document.getElementById('admin-announcement-duration').value = settings.announcement_duration_minutes || 60;
+        const announcementEnabledEl = document.getElementById('admin-announcement-enabled');
+        if (announcementEnabledEl) {
+            announcementEnabledEl.checked = settings.announcement_enabled !== false;
+        }
+        
+        const announcementMessageEl = document.getElementById('admin-announcement-message');
+        if (announcementMessageEl) {
+            announcementMessageEl.value = settings.announcement_message || '';
+        }
+        
+        const announcementDurationEl = document.getElementById('admin-announcement-duration');
+        if (announcementDurationEl) {
+            announcementDurationEl.value = settings.announcement_duration_minutes || 60;
+        }
+    }
+    
+    function showStatusMessage(elementId, message, className) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        
+        el.textContent = message;
+        el.className = className;
+        el.style.display = 'block';
+        
+        setTimeout(() => {
+            el.style.display = 'none';
+        }, 5000);
     }
     
     function showAdminStatus(message, type) {
-        const statusEl = document.getElementById('admin-status-message');
-        if (!statusEl) return;
-        
-        statusEl.textContent = message;
-        statusEl.className = `status-message ${type}`;
-        statusEl.style.display = 'block';
-        
-        setTimeout(() => {
-            statusEl.style.display = 'none';
-        }, 5000);
+        const className = `status-message ${type}`;
+        showStatusMessage('admin-status-message', message, className);
     }
     
     function showAdminSmtpTestResult(success, message) {
-        const resultEl = document.getElementById('admin-smtp-test-result');
-        if (!resultEl) return;
-        
-        resultEl.textContent = message;
-        resultEl.className = success ? 'status-message success' : 'status-message error';
-        resultEl.style.display = 'block';
-        
-        setTimeout(() => {
-            resultEl.style.display = 'none';
-        }, 5000);
+        const className = success ? 'status-message success' : 'status-message error';
+        showStatusMessage('admin-smtp-test-result', message, className);
     }
     
     function logout() {

@@ -3094,3 +3094,13 @@ body.announcement-visible .main-container {
     max-height: 85vh;
     overflow-y: auto;
 }
+
+.admin-subtitle {
+    color: #b9bbbe;
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+
+#admin-smtp-test-result {
+    margin-top: 10px;
+}

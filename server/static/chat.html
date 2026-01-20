@@ -778,21 +778,21 @@
     </div>
     
     <!-- Admin Settings Modal -->
-    <div id="admin-settings-modal" class="modal hidden">
+    <div id="admin-settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="admin-settings-heading">
         <div class="modal-content modal-content-large">
-            <h3>⚙️ Admin Settings</h3>
-            <p style="color: #b9bbbe; font-size: 14px; margin-bottom: 20px;">Site-wide settings • Accessible only to the first user</p>
+            <h3 id="admin-settings-heading">⚙️ Admin Settings</h3>
+            <p class="admin-subtitle">Site-wide settings • Accessible only to the first user</p>
             
-            <div id="admin-status-message" class="status-message" style="display: none;"></div>
+            <div id="admin-status-message" class="status-message hidden"></div>
             
-            <div class="settings-tabs">
-                <button class="settings-tab active" data-tab="general">General</button>
-                <button class="settings-tab" data-tab="smtp">Email/SMTP</button>
-                <button class="settings-tab" data-tab="announcements">Announcements</button>
+            <div class="settings-tabs" role="tablist">
+                <button class="settings-tab active" data-tab="general" role="tab" aria-selected="true" aria-controls="admin-general-tab" id="tab-general">General</button>
+                <button class="settings-tab" data-tab="smtp" role="tab" aria-selected="false" aria-controls="admin-smtp-tab" id="tab-smtp">Email/SMTP</button>
+                <button class="settings-tab" data-tab="announcements" role="tab" aria-selected="false" aria-controls="admin-announcements-tab" id="tab-announcements">Announcements</button>
             </div>
             
             <!-- General Settings Tab -->
-            <div id="admin-general-tab" class="settings-tab-content active">
+            <div id="admin-general-tab" class="settings-tab-content active" role="tabpanel" aria-labelledby="tab-general">
                 <div class="form-group">
                     <label for="admin-server-name">Server Name</label>
                     <input type="text" id="admin-server-name" class="form-input" placeholder="Decentra Chat">
@@ -834,7 +834,7 @@
             </div>
             
             <!-- SMTP Settings Tab -->
-            <div id="admin-smtp-tab" class="settings-tab-content" style="display: none;">
+            <div id="admin-smtp-tab" class="settings-tab-content hidden" role="tabpanel" aria-labelledby="tab-smtp">
                 <div class="form-group">
                     <label>
                         <input type="checkbox" id="admin-require-email-verification">
@@ -888,12 +888,12 @@
                 
                 <div class="form-group">
                     <button id="admin-test-smtp-btn" class="btn btn-secondary">Test SMTP Connection</button>
-                    <div id="admin-smtp-test-result" style="margin-top: 10px; display: none;"></div>
+                    <div id="admin-smtp-test-result" class="hidden"></div>
                 </div>
             </div>
             
             <!-- Announcements Tab -->
-            <div id="admin-announcements-tab" class="settings-tab-content" style="display: none;">
+            <div id="admin-announcements-tab" class="settings-tab-content hidden" role="tabpanel" aria-labelledby="tab-announcements">
                 <div class="form-group">
                     <label>
                         <input type="checkbox" id="admin-announcement-enabled">
