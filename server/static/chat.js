@@ -2116,19 +2116,29 @@
         fileInput.addEventListener('change', (e) => {
             const files = Array.from(e.target.files);
             
-            // Validate file sizes
+            // Validate file sizes and separate valid/invalid files
+            const validFiles = [];
+            const invalidFiles = [];
+            
             for (const file of files) {
                 const sizeMB = file.size / (1024 * 1024);
                 if (sizeMB > maxAttachmentSizeMB) {
-                    alert(`File "${file.name}" exceeds maximum size of ${maxAttachmentSizeMB}MB`);
-                    fileInput.value = ''; // Reset
-                    return;
+                    invalidFiles.push(file);
+                } else {
+                    validFiles.push(file);
                 }
             }
             
-            // Add files to pending attachments
-            pendingAttachments.push(...files);
-            updateAttachmentPreview();
+            if (invalidFiles.length > 0) {
+                const names = invalidFiles.map(f => `"${f.name}"`).join(', ');
+                alert(`The following file(s) exceed the maximum size of ${maxAttachmentSizeMB}MB and were not added: ${names}`);
+            }
+            
+            if (validFiles.length > 0) {
+                // Add only valid files to pending attachments
+                pendingAttachments.push(...validFiles);
+                updateAttachmentPreview();
+            }
             
             // Reset file input
             fileInput.value = '';
