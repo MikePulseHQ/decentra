@@ -79,7 +79,7 @@ This implementation adds comprehensive file attachment functionality to the Dece
 - File size validation against admin limits
 - Ownership verification (only attach to own messages)
 - Admin setting enforcement
-- SQL injection protection via parameterized queries
+- Use of parameterized queries for user-supplied values wherever supported, with known limitations in some maintenance queries that require strict input validation until fully remediated
 
 #### Client-Side
 - File size validation before upload
