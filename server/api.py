@@ -308,7 +308,6 @@ async def api_upload_attachment(request):
         username = None
         password = None
         message_id = None
-        file_field = None
         filename = None
         content_type = None
         file_data = None
