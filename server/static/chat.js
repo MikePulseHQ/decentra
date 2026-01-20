@@ -54,6 +54,8 @@
     
     // File attachment state
     let pendingAttachments = []; // Files to be uploaded with next message
+    let lastSentMessageTime = 0; // Track when last message was sent to prevent race conditions
+    let attachmentUploadQueue = new Map(); // Map of message content hash to attachments
     
     // Video toggle constants
     const DEFAULT_SCREEN_SHARE_PRIORITY = true; // When both video and screenshare are active, show screenshare by default
@@ -581,10 +583,14 @@
                 console.log('Current context:', currentContext);
                 console.log('Is for current context:', isMessageForCurrentContext(data));
                 
-                // If this is our own message and has an ID, upload pending attachments
-                if (data.username === username && data.id && pendingAttachments.length > 0) {
-                    console.log('Uploading attachments for message:', data.id);
-                    uploadAttachments(data.id);
+                // If this is our own message and has an ID, upload queued attachments
+                if (data.username === username && data.id && data.messageKey) {
+                    const attachments = attachmentUploadQueue.get(data.messageKey);
+                    if (attachments && attachments.length > 0) {
+                        console.log('Uploading attachments for message:', data.id);
+                        uploadAttachmentsForMessage(data.id, attachments);
+                        attachmentUploadQueue.delete(data.messageKey);
+                    }
                 }
                 
                 if (isMessageForCurrentContext(data)) {
@@ -2059,15 +2065,20 @@
         }
         
         console.log('Sending message:', msgData);
+        
+        // Store attachments in queue before sending (to avoid race conditions)
+        const messageKey = `${Date.now()}_${message}`;
+        if (pendingAttachments.length > 0) {
+            attachmentUploadQueue.set(messageKey, [...pendingAttachments]);
+            console.log(`Queued ${pendingAttachments.length} attachments for message`);
+            pendingAttachments = [];
+            updateAttachmentPreview();
+        }
+        
+        // Send message with key for correlation
+        msgData.messageKey = messageKey;
         ws.send(JSON.stringify(msgData));
         messageInput.value = '';
-        
-        // Handle file attachments after message is sent
-        // Store pending attachments for upload after we get the message ID
-        if (pendingAttachments.length > 0) {
-            // We'll upload files when we receive the message confirmation with ID
-            console.log(`${pendingAttachments.length} attachments pending upload`);
-        }
     });
     
     // File attachment button click
@@ -2144,8 +2155,10 @@
             removeBtn.className = 'attachment-item-remove';
             removeBtn.textContent = '×';
             removeBtn.type = 'button';
-            removeBtn.onclick = () => {
-                pendingAttachments.splice(index, 1);
+            removeBtn.dataset.fileIndex = index; // Store index for reference
+            removeBtn.onclick = (e) => {
+                const idx = parseInt(e.target.dataset.fileIndex);
+                pendingAttachments.splice(idx, 1);
                 updateAttachmentPreview();
             };
             
@@ -2165,8 +2178,8 @@
     }
     
     // Upload attachments for a message
-    async function uploadAttachments(messageId) {
-        if (pendingAttachments.length === 0) return;
+    async function uploadAttachmentsForMessage(messageId, attachments) {
+        if (!attachments || attachments.length === 0) return;
         
         const password = sessionStorage.getItem('password');
         if (!password) {
@@ -2174,7 +2187,7 @@
             return;
         }
         
-        for (const file of pendingAttachments) {
+        for (const file of attachments) {
             try {
                 const formData = new FormData();
                 formData.append('file', file);
@@ -2191,16 +2204,16 @@
                 if (!result.success) {
                     console.error('Failed to upload attachment:', result.error);
                     alert(`Failed to upload "${file.name}": ${result.error}`);
+                } else {
+                    console.log(`Uploaded attachment: ${file.name}`);
+                    // Refresh the message to show the attachment
+                    // We could reload the message here, or wait for a broadcast update
                 }
             } catch (error) {
                 console.error('Error uploading attachment:', error);
                 alert(`Error uploading "${file.name}": ${error.message}`);
             }
         }
-        
-        // Clear pending attachments
-        pendingAttachments = [];
-        updateAttachmentPreview();
     }
     
     // Message input - handle mention autocomplete

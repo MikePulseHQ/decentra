@@ -1099,24 +1099,6 @@ class Database:
             result = cursor.fetchone()
             return result['id']
     
-    def get_message(self, message_id: int) -> Optional[Dict]:
-        """Get a single message by ID."""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                SELECT m.id, m.username, m.content, 
-                       m.timestamp::text as timestamp,
-                       m.context_type, m.context_id
-                FROM messages m
-                WHERE m.id = %s
-            ''', (message_id,))
-            result = cursor.fetchone()
-            if result:
-                msg = dict(result)
-                msg['content'] = self.encryption_manager.decrypt(msg['content'])
-                return msg
-            return None
-    
     def get_messages(self, context_type: str, context_id: Optional[str] = None, limit: int = 100) -> List[Dict]:
         """Get messages for a context. Message content is decrypted before returning."""
         with self.get_connection() as conn:

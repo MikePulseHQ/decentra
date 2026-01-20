@@ -5,6 +5,8 @@ Provides HTTP REST API for future desktop application integration
 """
 
 import json
+import uuid
+import base64
 from aiohttp import web
 import bcrypt
 
@@ -364,8 +366,6 @@ async def api_upload_attachment(request):
             }, status=403)
         
         # Generate attachment ID
-        import uuid
-        import base64
         attachment_id = f"att_{uuid.uuid4().hex[:16]}"
         
         # Encode file data as base64
@@ -423,7 +423,6 @@ async def api_download_attachment(request):
             }, status=404)
         
         # Decode base64 file data
-        import base64
         file_data = base64.b64decode(attachment['file_data'])
         
         # Return file with appropriate headers
