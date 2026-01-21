@@ -2090,6 +2090,24 @@
                         video.controls = true;
                         video.src = downloadUrl;
                         
+                        // Add error handling for video playback issues
+                        video.onerror = function() {
+                            console.error('Failed to load video:', filename);
+                            // Replace video with download link on error
+                            const errorLink = document.createElement('a');
+                            errorLink.className = 'message-attachment';
+                            errorLink.href = downloadUrl;
+                            errorLink.download = sanitizeFilename(filename);
+                            errorLink.innerHTML = `
+                                <span class="message-attachment-icon">📎</span>
+                                <div class="message-attachment-info">
+                                    <div class="message-attachment-name">${escapeHtml(filename)}</div>
+                                    <div class="message-attachment-size">${formatFileSize(attachment.file_size)}</div>
+                                </div>
+                            `;
+                            videoEmbed.replaceWith(errorLink);
+                        };
+                        
                         videoEmbed.appendChild(video);
                         attachmentsDiv.appendChild(videoEmbed);
                     } else if (isImage) {
@@ -2100,6 +2118,24 @@
                         const img = document.createElement('img');
                         img.src = downloadUrl;
                         img.alt = escapeHtml(filename);
+                        
+                        // Add error handling for image loading issues
+                        img.onerror = function() {
+                            console.error('Failed to load image:', filename);
+                            // Replace image with download link on error
+                            const errorLink = document.createElement('a');
+                            errorLink.className = 'message-attachment';
+                            errorLink.href = downloadUrl;
+                            errorLink.download = sanitizeFilename(filename);
+                            errorLink.innerHTML = `
+                                <span class="message-attachment-icon">📎</span>
+                                <div class="message-attachment-info">
+                                    <div class="message-attachment-name">${escapeHtml(filename)}</div>
+                                    <div class="message-attachment-size">${formatFileSize(attachment.file_size)}</div>
+                                </div>
+                            `;
+                            imageEmbed.replaceWith(errorLink);
+                        };
                         
                         imageEmbed.appendChild(img);
                         attachmentsDiv.appendChild(imageEmbed);
@@ -2250,6 +2286,8 @@
             chatContainer.addEventListener(eventName, () => {
                 if (allowFileAttachments) {
                     chatContainer.classList.add('drag-over');
+                    // Announce to screen readers
+                    chatContainer.setAttribute('aria-label', 'Drop zone active. Drop files to attach them to your message.');
                 }
             }, false);
         });
@@ -2257,6 +2295,7 @@
         ['dragleave', 'drop'].forEach(eventName => {
             chatContainer.addEventListener(eventName, () => {
                 chatContainer.classList.remove('drag-over');
+                chatContainer.removeAttribute('aria-label');
             }, false);
         });
         
