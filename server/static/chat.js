@@ -2072,22 +2072,59 @@
                         continue;
                     }
                     
-                    const attachmentLink = document.createElement('a');
-                    attachmentLink.className = 'message-attachment';
-                    attachmentLink.href = `/api/download-attachment/${encodeURIComponent(attachmentId)}`;
+                    const downloadUrl = `/api/download-attachment/${encodeURIComponent(attachmentId)}`;
+                    const filename = attachment.filename || 'file';
+                    const contentType = attachment.content_type || '';
                     
-                    // Sanitize filename for download attribute
-                    attachmentLink.download = sanitizeFilename(attachment.filename);
+                    // Check if this is a media file that should be embedded
+                    const isImage = contentType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(filename);
+                    const isVideo = contentType.startsWith('video/') || /\.(mp4|webm|ogg|mov)$/i.test(filename);
                     
-                    attachmentLink.innerHTML = `
-                        <span class="message-attachment-icon">📎</span>
-                        <div class="message-attachment-info">
-                            <div class="message-attachment-name">${escapeHtml(attachment.filename)}</div>
-                            <div class="message-attachment-size">${formatFileSize(attachment.file_size)}</div>
-                        </div>
-                    `;
-                    
-                    attachmentsDiv.appendChild(attachmentLink);
+                    if (isVideo) {
+                        // Create embedded video player
+                        const videoEmbed = document.createElement('div');
+                        videoEmbed.className = 'embed embed-video';
+                        
+                        const video = document.createElement('video');
+                        video.controls = true;
+                        video.src = downloadUrl;
+                        video.style.maxWidth = '100%';
+                        video.style.maxHeight = '400px';
+                        
+                        videoEmbed.appendChild(video);
+                        attachmentsDiv.appendChild(videoEmbed);
+                    } else if (isImage) {
+                        // Create embedded image
+                        const imageEmbed = document.createElement('div');
+                        imageEmbed.className = 'embed embed-image';
+                        
+                        const img = document.createElement('img');
+                        img.src = downloadUrl;
+                        img.alt = escapeHtml(filename);
+                        img.style.maxWidth = '100%';
+                        img.style.maxHeight = '400px';
+                        
+                        imageEmbed.appendChild(img);
+                        attachmentsDiv.appendChild(imageEmbed);
+                    } else {
+                        // Create download link for other files
+                        const attachmentLink = document.createElement('a');
+                        attachmentLink.className = 'message-attachment';
+                        attachmentLink.href = downloadUrl;
+                        
+                        // Sanitize filename for download attribute
+                        attachmentLink.download = sanitizeFilename(attachment.filename);
+                        
+                        attachmentLink.innerHTML = `
+                            <span class="message-attachment-icon">📎</span>
+                            <div class="message-attachment-info">
+                                <div class="message-attachment-name">${escapeHtml(attachment.filename)}</div>
+                                <div class="message-attachment-size">${formatFileSize(attachment.file_size)}</div>
+                            </div>
+                        `;
+                        
+                        attachmentsDiv.appendChild(attachmentLink);
+                    }
                 }
                 
                 container.appendChild(attachmentsDiv);
