@@ -2423,6 +2423,10 @@
         
         // Refresh the message to show uploaded attachments
         if (uploadedCount > 0) {
+            // Use a small delay to ensure the message element is in the DOM
+            // This handles cases where the upload completes very quickly
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
             const messageDiv = document.querySelector(`[data-message-id="${messageId}"]`);
             if (messageDiv) {
                 // Find the content wrapper
@@ -2436,6 +2440,8 @@
                     // Reload attachments to display the newly uploaded ones
                     await loadMessageAttachments(messageId, contentWrapper);
                 }
+            } else {
+                console.warn(`Message element not found for ID ${messageId}, attachments may not display until refresh`);
             }
         }
     }
