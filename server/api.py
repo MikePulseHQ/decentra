@@ -348,7 +348,7 @@ async def api_upload_attachment(request):
             elif field.name == 'password':
                 password = (await field.read()).decode('utf-8')
             elif field.name == 'token':
-                token = (await field.read()).decode('utf-8')
+                token = (await field.read()).decode('utf-8').strip()
             elif field.name == 'message_id':
                 message_id = int((await field.read()).decode('utf-8'))
             elif field.name == 'file':
