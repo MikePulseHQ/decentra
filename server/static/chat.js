@@ -2191,7 +2191,8 @@
         
         // Store attachments in queue before sending (to avoid race conditions)
         // Use timestamp + random component + message for uniqueness
-        const messageKey = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${message}`;
+        // Use 'attachment_only' as fallback when message is empty
+        const messageKey = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${message || 'attachment_only'}`;
         if (pendingAttachments.length > 0) {
             attachmentUploadQueue.set(messageKey, [...pendingAttachments]);
             console.log(`Queued ${pendingAttachments.length} attachments for message`);
