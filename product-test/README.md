@@ -40,6 +40,7 @@ cd product-test && python3 test_ssl.py
 - `test_https_server.py` - HTTPS server tests
 - `test_message_edit_delete.py` - Message editing and deletion tests
 - `test_message_encryption.py` - Message encryption tests
+- `test_messagekey_passthrough.py` - WebSocket messageKey passthrough tests
 - `test_profile.py` - User profile tests
 - `test_rich_embeds.py` - Rich embeds functionality tests
 - `test_rich_embeds.html` - Rich embeds visual examples
