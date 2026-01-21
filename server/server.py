@@ -892,10 +892,6 @@ async def handler(websocket):
                             'reactions': []  # New messages have no reactions initially
                         }
                         
-                        # Include messageKey if provided (for file attachment correlation)
-                        if message_key:
-                            msg_obj['messageKey'] = message_key
-                        
                         # Route message based on context
                         if context == 'server' and context_id:
                             # Server channel message
