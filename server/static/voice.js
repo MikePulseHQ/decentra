@@ -29,8 +29,12 @@ class VoiceChat {
         this.pushToTalkKeyPressed = false;
         this.pttKeyDisplayName = 'Space'; // Display name for the key
         
-        // Load push-to-talk settings from localStorage
+        // Noise suppression settings
+        this.noiseSuppression = 'high'; // Default: high (options: 'none', 'medium', 'high')
+        
+        // Load push-to-talk and noise suppression settings from localStorage
         this.loadPushToTalkSettings();
+        this.loadNoiseSuppressionSettings();
         
         // Video configuration constants
         this.VIDEO_WIDTH = 640;
@@ -57,9 +61,27 @@ class VoiceChat {
                 return false;
             }
 
+            // Build audio constraints with noise suppression
+            let audioConstraints = this.selectedMicrophoneId ? 
+                { deviceId: { exact: this.selectedMicrophoneId } } : {};
+            
+            // Apply noise suppression based on setting
+            if (this.noiseSuppression === 'none') {
+                audioConstraints.noiseSuppression = false;
+                audioConstraints.echoCancellation = true; // Keep echo cancellation on
+                audioConstraints.autoGainControl = true; // Keep auto gain control on
+            } else if (this.noiseSuppression === 'medium') {
+                audioConstraints.noiseSuppression = { ideal: true };
+                audioConstraints.echoCancellation = true;
+                audioConstraints.autoGainControl = true;
+            } else { // 'high'
+                audioConstraints.noiseSuppression = true;
+                audioConstraints.echoCancellation = true;
+                audioConstraints.autoGainControl = true;
+            }
+            
             const constraints = { 
-                audio: this.selectedMicrophoneId ? 
-                    { deviceId: { exact: this.selectedMicrophoneId } } : true, 
+                audio: audioConstraints,
                 video: false 
             };
             
@@ -202,9 +224,27 @@ class VoiceChat {
             const wasInVoice = this.currentVoiceChannel !== null;
             const oldStream = this.localStream;
             
-            // Get new stream
+            // Build audio constraints with noise suppression
+            let audioConstraints = deviceId ? 
+                { deviceId: { exact: deviceId } } : {};
+            
+            // Apply noise suppression based on setting
+            if (this.noiseSuppression === 'none') {
+                audioConstraints.noiseSuppression = false;
+                audioConstraints.echoCancellation = true;
+                audioConstraints.autoGainControl = true;
+            } else if (this.noiseSuppression === 'medium') {
+                audioConstraints.noiseSuppression = { ideal: true };
+                audioConstraints.echoCancellation = true;
+                audioConstraints.autoGainControl = true;
+            } else { // 'high'
+                audioConstraints.noiseSuppression = true;
+                audioConstraints.echoCancellation = true;
+                audioConstraints.autoGainControl = true;
+            }
+            
             const constraints = { 
-                audio: deviceId ? { deviceId: { exact: deviceId } } : true, 
+                audio: audioConstraints,
                 video: false 
             };
             
@@ -1132,5 +1172,85 @@ class VoiceChat {
         }
         
         return false;
+    }
+    
+    // Noise suppression methods
+    loadNoiseSuppressionSettings() {
+        const noiseSuppression = localStorage.getItem('noiseSuppression');
+        if (noiseSuppression && ['none', 'medium', 'high'].includes(noiseSuppression)) {
+            this.noiseSuppression = noiseSuppression;
+        } else {
+            // Default to 'high' if not set
+            this.noiseSuppression = 'high';
+        }
+    }
+    
+    async setNoiseSuppression(level) {
+        if (!['none', 'medium', 'high'].includes(level)) {
+            console.error('Invalid noise suppression level:', level);
+            return;
+        }
+        
+        this.noiseSuppression = level;
+        localStorage.setItem('noiseSuppression', level);
+        
+        // If we're already in a call, restart the audio stream with new settings
+        if (this.localStream) {
+            const wasInVoice = this.currentVoiceChannel !== null || this.inDirectCall;
+            const oldStream = this.localStream;
+            
+            // Build audio constraints with new noise suppression setting
+            let audioConstraints = this.selectedMicrophoneId ? 
+                { deviceId: { exact: this.selectedMicrophoneId } } : {};
+            
+            // Apply noise suppression based on setting
+            if (level === 'none') {
+                audioConstraints.noiseSuppression = false;
+                audioConstraints.echoCancellation = true;
+                audioConstraints.autoGainControl = true;
+            } else if (level === 'medium') {
+                audioConstraints.noiseSuppression = { ideal: true };
+                audioConstraints.echoCancellation = true;
+                audioConstraints.autoGainControl = true;
+            } else { // 'high'
+                audioConstraints.noiseSuppression = true;
+                audioConstraints.echoCancellation = true;
+                audioConstraints.autoGainControl = true;
+            }
+            
+            const constraints = { 
+                audio: audioConstraints,
+                video: false 
+            };
+            
+            try {
+                this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                // Replace audio track in all peer connections
+                this.peerConnections.forEach(pc => {
+                    const senders = pc.getSenders();
+                    const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
+                    if (audioSender && this.localStream) {
+                        const newAudioTrack = this.localStream.getAudioTracks()[0];
+                        audioSender.replaceTrack(newAudioTrack);
+                    }
+                });
+                
+                // Stop old stream
+                oldStream.getTracks().forEach(track => track.stop());
+                
+                // Restore muted state
+                if (this.isMuted) {
+                    this.localStream.getAudioTracks().forEach(track => {
+                        track.enabled = false;
+                    });
+                }
+                
+                console.log(`Noise suppression changed to: ${level}`);
+            } catch (error) {
+                console.error('Error changing noise suppression:', error);
+                alert('Failed to change noise suppression. Please try again.');
+            }
+        }
     }
 }

@@ -227,6 +227,7 @@
     const voiceSettingsModal = document.getElementById('voice-settings-modal');
     const menuVoiceSettingsBtn = document.getElementById('menu-voice-settings-btn');
     const closeVoiceSettingsModalBtn = document.getElementById('close-voice-settings-modal');
+    const noiseSuppressionSelect = document.getElementById('noise-suppression');
     const enablePushToTalkCheckbox = document.getElementById('enable-push-to-talk');
     const pttKeybindDisplay = document.getElementById('ptt-keybind-display');
     const setPttKeybindBtn = document.getElementById('set-ptt-keybind-btn');
@@ -4512,6 +4513,7 @@
         
         // Load current settings
         if (voiceChat) {
+            noiseSuppressionSelect.value = voiceChat.noiseSuppression;
             enablePushToTalkCheckbox.checked = voiceChat.isPushToTalkEnabled;
             pttKeybindDisplay.value = voiceChat.pttKeyDisplayName;
             
@@ -4527,6 +4529,12 @@
     voiceSettingsModal.addEventListener('click', (e) => {
         if (e.target === voiceSettingsModal) {
             voiceSettingsModal.classList.add('hidden');
+        }
+    });
+    
+    noiseSuppressionSelect.addEventListener('change', async (e) => {
+        if (voiceChat) {
+            await voiceChat.setNoiseSuppression(e.target.value);
         }
     });
     
