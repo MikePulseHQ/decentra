@@ -849,6 +849,7 @@ class Database:
                     VALUES (%s, %s, FALSE, %s, %s)
                     ON CONFLICT (username) 
                     DO UPDATE SET secret = %s, backup_codes = %s, enabled = FALSE
+                    WHERE user_2fa.enabled = FALSE
                 ''', (username, secret, backup_codes, datetime.now(), secret, backup_codes))
                 return True
         except Exception:
