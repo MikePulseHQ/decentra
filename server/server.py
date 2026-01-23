@@ -1003,10 +1003,16 @@ async def handler(websocket):
                     continue
                 
                 # Validate password strength
-                if len(new_password) < 6:
+                if (
+                    len(new_password) < 8
+                    or not re.search(r"[a-z]", new_password)
+                    or not re.search(r"[A-Z]", new_password)
+                    or not re.search(r"[0-9]", new_password)
+                    or not re.search(r"[^A-Za-z0-9]", new_password)
+                ):
                     await websocket.send_str(json.dumps({
                         'type': 'auth_error',
-                        'message': 'Password must be at least 6 characters'
+                        'message': 'Password must be at least 8 characters and include lowercase, uppercase, number, and special character'
                     }))
                     continue
                 
