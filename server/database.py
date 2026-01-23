@@ -1289,16 +1289,19 @@ class Database:
             if not channels_to_purge:
                 return 0
             
+            # Build full context IDs in the format "server_id/channel_id"
+            context_ids_to_purge = [f"{server_id}/{ch}" for ch in channels_to_purge]
+            
             # Delete messages from non-exempted channels
             # Note: Using f-string for placeholders only (safe - not for user data)
-            # The actual channel IDs are passed as parameterized values
-            placeholders = ','.join(['%s'] * len(channels_to_purge))
+            # The actual context IDs are passed as parameterized values
+            placeholders = ','.join(['%s'] * len(context_ids_to_purge))
             cursor.execute(f'''
                 DELETE FROM messages
-                WHERE context_type = 'server' 
+                WHERE context_type = 'channel' 
                 AND context_id IN ({placeholders})
                 AND timestamp < NOW() - make_interval(days => %s)
-            ''', (*channels_to_purge, days))
+            ''', (*context_ids_to_purge, days))
             return cursor.rowcount
     
     # Server settings operations
