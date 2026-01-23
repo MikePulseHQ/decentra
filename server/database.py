@@ -9,6 +9,7 @@ import psycopg2.extras
 import json
 import os
 import time
+import secrets
 from datetime import datetime
 from contextlib import contextmanager
 from typing import List, Dict, Set, Optional, Tuple
@@ -234,6 +235,41 @@ class Database:
                             created_at TIMESTAMP NOT NULL,
                             expires_at TIMESTAMP NOT NULL,
                             PRIMARY KEY (email, username)
+                        )
+                    ''')
+                    
+                    # Password reset tokens table
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                            token VARCHAR(255) PRIMARY KEY,
+                            username VARCHAR(255) NOT NULL,
+                            created_at TIMESTAMP NOT NULL,
+                            expires_at TIMESTAMP NOT NULL,
+                            used BOOLEAN DEFAULT FALSE,
+                            FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE
+                        )
+                    ''')
+                    
+                    # Two-factor authentication table
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS user_2fa (
+                            username VARCHAR(255) PRIMARY KEY,
+                            secret VARCHAR(255) NOT NULL,
+                            enabled BOOLEAN DEFAULT FALSE,
+                            backup_codes TEXT,
+                            created_at TIMESTAMP NOT NULL,
+                            FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE
+                        )
+                    ''')
+                    
+                    # End-to-end encryption keys table
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS user_e2e_keys (
+                            username VARCHAR(255) PRIMARY KEY,
+                            public_key TEXT NOT NULL,
+                            private_key_encrypted TEXT NOT NULL,
+                            created_at TIMESTAMP NOT NULL,
+                            FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE
                         )
                     ''')
                     
@@ -736,6 +772,209 @@ class Database:
         except Exception as e:
             # Log and suppress cleanup errors to avoid impacting callers
             print(f"Error cleaning up expired verification codes: {e}")
+    
+    def create_password_reset_token(self, username: str, token: str, expires_at: datetime) -> bool:
+        """Create a password reset token."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO password_reset_tokens (token, username, created_at, expires_at, used)
+                    VALUES (%s, %s, CURRENT_TIMESTAMP, %s, %s)
+                ''', (token, username, expires_at, False))
+                return True
+        except Exception:
+            return False
+    
+    def get_password_reset_token(self, token: str) -> Optional[Dict]:
+        """Get a password reset token."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT token, username, created_at::text as created_at, 
+                       expires_at::text as expires_at, used
+                FROM password_reset_tokens
+                WHERE token = %s
+            ''', (token,))
+            result = cursor.fetchone()
+            return dict(result) if result else None
+    
+    def mark_reset_token_used(self, token: str) -> bool:
+        """Mark a password reset token as used."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    UPDATE password_reset_tokens 
+                    SET used = TRUE
+                    WHERE token = %s
+                ''', (token,))
+                return True
+        except Exception:
+            return False
+    
+    def cleanup_expired_reset_tokens(self):
+        """Remove expired password reset tokens."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    DELETE FROM password_reset_tokens 
+                    WHERE expires_at <= CURRENT_TIMESTAMP OR used = TRUE
+                ''')
+        except Exception as e:
+            print(f"Error cleaning up expired reset tokens: {e}")
+    
+    def update_user_password(self, username: str, password_hash: str) -> bool:
+        """Update a user's password."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    UPDATE users 
+                    SET password_hash = %s
+                    WHERE username = %s
+                ''', (password_hash, username))
+                return cursor.rowcount > 0
+        except Exception:
+            return False
+    
+    # 2FA operations
+    def create_2fa_secret(self, username: str, secret: str, backup_codes: str) -> bool:
+        """Create 2FA secret for a user (not enabled yet)."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO user_2fa (username, secret, enabled, backup_codes, created_at)
+                    VALUES (%s, %s, FALSE, %s, %s)
+                    ON CONFLICT (username) 
+                    DO UPDATE SET secret = %s, backup_codes = %s, enabled = FALSE
+                    WHERE user_2fa.enabled = FALSE
+                ''', (username, secret, backup_codes, datetime.now(), secret, backup_codes))
+                return True
+        except Exception:
+            return False
+    
+    def enable_2fa(self, username: str) -> bool:
+        """Enable 2FA for a user."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    UPDATE user_2fa 
+                    SET enabled = TRUE
+                    WHERE username = %s
+                ''', (username,))
+                return cursor.rowcount > 0
+        except Exception:
+            return False
+    
+    def disable_2fa(self, username: str) -> bool:
+        """Disable 2FA for a user."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    DELETE FROM user_2fa
+                    WHERE username = %s
+                ''', (username,))
+                return True
+        except Exception:
+            return False
+    
+    def get_2fa_secret(self, username: str) -> Optional[Dict]:
+        """Get 2FA secret for a user."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT username, secret, enabled, backup_codes, created_at::text as created_at
+                FROM user_2fa
+                WHERE username = %s
+            ''', (username,))
+            result = cursor.fetchone()
+            return dict(result) if result else None
+    
+    def use_backup_code(self, username: str, code: str) -> bool:
+        """Use a 2FA backup code (removes it from the list)."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                # Get current backup codes
+                cursor.execute('''
+                    SELECT backup_codes FROM user_2fa WHERE username = %s
+                ''', (username,))
+                result = cursor.fetchone()
+                if not result:
+                    return False
+
+                original_backup_codes = result['backup_codes'] or ''
+                backup_codes = original_backup_codes.split(',') if original_backup_codes else []
+                
+                # Use constant-time comparison to prevent timing attacks
+                # Check all codes to avoid leaking position information
+                found = False
+                for backup_code in backup_codes:
+                    if secrets.compare_digest(code, backup_code):
+                        found = True
+                        # Don't break - continue checking to maintain constant time
+                
+                if not found:
+                    return False
+
+                # Remove the used code
+                backup_codes.remove(code)
+                new_codes = ','.join(backup_codes)
+
+                # Optimistic concurrency control: only update if backup_codes
+                # still match the original value we read.
+                cursor.execute('''
+                    UPDATE user_2fa 
+                    SET backup_codes = %s
+                    WHERE username = %s AND backup_codes = %s
+                ''', (new_codes, username, original_backup_codes))
+                if cursor.rowcount == 0:
+                    # Another concurrent operation likely modified backup_codes
+                    return False
+                return True
+        except Exception:
+            return False
+    
+    # E2E Encryption operations
+    def save_e2e_keys(self, username: str, public_key: str, private_key_encrypted: str) -> bool:
+        """Save E2E encryption keys for a user."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO user_e2e_keys (username, public_key, private_key_encrypted, created_at)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (username) 
+                    DO UPDATE SET public_key = %s, private_key_encrypted = %s
+                ''', (username, public_key, private_key_encrypted, datetime.now(), public_key, private_key_encrypted))
+                return True
+        except Exception:
+            return False
+    
+    def get_e2e_public_key(self, username: str) -> Optional[str]:
+        """Get a user's E2E public key."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT public_key FROM user_e2e_keys WHERE username = %s
+            ''', (username,))
+            result = cursor.fetchone()
+            return result['public_key'] if result else None
+    
+    def get_e2e_private_key(self, username: str) -> Optional[str]:
+        """Get a user's E2E private key (encrypted)."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT private_key_encrypted FROM user_e2e_keys WHERE username = %s
+            ''', (username,))
+            result = cursor.fetchone()
+            return result['private_key_encrypted'] if result else None
     
     def get_first_user(self) -> Optional[str]:
         """Get the first user (admin) username."""
@@ -1246,6 +1485,16 @@ class Database:
                 ORDER BY uploaded_at ASC
             ''', (message_id,))
             return [dict(row) for row in cursor.fetchall()]
+    
+    def delete_attachment(self, attachment_id: str) -> bool:
+        """Delete a specific attachment by ID. Returns True if deleted."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                DELETE FROM message_attachments
+                WHERE attachment_id = %s
+            ''', (attachment_id,))
+            return cursor.rowcount > 0
     
     def delete_old_attachments(self, days: int) -> int:
         """Delete attachments older than specified days. Returns count of deleted attachments."""
