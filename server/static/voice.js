@@ -1037,10 +1037,7 @@ class VoiceChat {
         this.isPushToTalkEnabled = enabled;
         localStorage.setItem('pushToTalkEnabled', enabled);
 
-        // Whenever toggling PTT, clear any stale key-pressed state
-        this.pushToTalkKeyPressed = false;
-        
-        // Reset key pressed state when toggling PTT
+        // Reset key pressed state when toggling PTT to prevent stuck state
         this.pushToTalkKeyPressed = false;
         
         // If disabling PTT and we're in a call, unmute if we were PTT-muted
