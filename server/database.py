@@ -261,6 +261,17 @@ class Database:
                         )
                     ''')
                     
+                    # End-to-end encryption keys table
+                    cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS user_e2e_keys (
+                            username VARCHAR(255) PRIMARY KEY,
+                            public_key TEXT NOT NULL,
+                            private_key_encrypted TEXT NOT NULL,
+                            created_at TIMESTAMP NOT NULL,
+                            FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE
+                        )
+                    ''')
+                    
                     # Custom emojis table
                     cursor.execute('''
                         CREATE TABLE IF NOT EXISTS custom_emojis (
@@ -876,6 +887,42 @@ class Database:
                 return True
         except Exception:
             return False
+    
+    # E2E Encryption operations
+    def save_e2e_keys(self, username: str, public_key: str, private_key_encrypted: str) -> bool:
+        """Save E2E encryption keys for a user."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO user_e2e_keys (username, public_key, private_key_encrypted, created_at)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (username) 
+                    DO UPDATE SET public_key = %s, private_key_encrypted = %s
+                ''', (username, public_key, private_key_encrypted, datetime.now(), public_key, private_key_encrypted))
+                return True
+        except Exception:
+            return False
+    
+    def get_e2e_public_key(self, username: str) -> Optional[str]:
+        """Get a user's E2E public key."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT public_key FROM user_e2e_keys WHERE username = %s
+            ''', (username,))
+            result = cursor.fetchone()
+            return result['public_key'] if result else None
+    
+    def get_e2e_private_key(self, username: str) -> Optional[str]:
+        """Get a user's E2E private key (encrypted)."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT private_key_encrypted FROM user_e2e_keys WHERE username = %s
+            ''', (username,))
+            result = cursor.fetchone()
+            return result['private_key_encrypted'] if result else None
     
     def get_first_user(self) -> Optional[str]:
         """Get the first user (admin) username."""

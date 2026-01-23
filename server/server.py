@@ -3551,6 +3551,17 @@ async def cleanup_old_attachments_periodically():
             print(f"Error in attachment cleanup task: {e}")
 
 
+async def cleanup_reset_tokens_periodically():
+    """Periodic task to clean up expired password reset tokens."""
+    while True:
+        try:
+            await asyncio.sleep(3600)  # Run every hour
+            db.cleanup_expired_reset_tokens()
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Cleaned up expired reset tokens")
+        except Exception as e:
+            print(f"Error in reset token cleanup task: {e}")
+
+
 async def main():
     """Start the HTTPS and WebSocket server."""
     print("Decentra Chat Server")
@@ -3587,6 +3598,7 @@ async def main():
     # Start periodic cleanup tasks
     asyncio.create_task(cleanup_verification_codes_periodically())
     asyncio.create_task(cleanup_old_attachments_periodically())
+    asyncio.create_task(cleanup_reset_tokens_periodically())
     
     print("Server started successfully!")
     print("Access the web client at https://localhost:8765")
