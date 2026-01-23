@@ -1893,11 +1893,15 @@ async def handler(websocket):
                             # Generate QR code
                             qr_code = generate_qr_code_base64(username, secret)
                             
+                            # NOTE: The raw 2FA secret is sent only for initial authenticator setup.
+                            # Clients must NOT store this value and should use it solely to configure
+                            # the authenticator app (e.g., via QR code generation) and then discard it.
                             await websocket.send_str(json.dumps({
                                 'type': '2fa_setup',
                                 'secret': secret,
                                 'qr_code': qr_code,
-                                'backup_codes': backup_codes
+                                'backup_codes': backup_codes,
+                                'warning': 'The 2FA secret is sensitive. Do NOT store it; use it only to set up your authenticator app and then discard it.'
                             }))
                         else:
                             await websocket.send_str(json.dumps({
