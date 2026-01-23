@@ -1018,11 +1018,17 @@ class VoiceChat {
         if (pttKeyDisplay) {
             this.pttKeyDisplayName = pttKeyDisplay;
         }
+
+        // Ensure push-to-talk key state starts in a non-pressed state
+        this.pushToTalkKeyPressed = false;
     }
     
     setPushToTalkEnabled(enabled) {
         this.isPushToTalkEnabled = enabled;
         localStorage.setItem('pushToTalkEnabled', enabled);
+
+        // Whenever toggling PTT, clear any stale key-pressed state
+        this.pushToTalkKeyPressed = false;
         
         // If disabling PTT and we're in a call, unmute if we were PTT-muted
         if (!enabled && this.localStream && this.isMuted) {
