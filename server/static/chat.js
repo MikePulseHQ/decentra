@@ -223,6 +223,15 @@
     const testMessageSoundBtn = document.getElementById('test-message-sound-btn');
     const testCallSoundBtn = document.getElementById('test-call-sound-btn');
     
+    // Voice settings elements
+    const voiceSettingsModal = document.getElementById('voice-settings-modal');
+    const menuVoiceSettingsBtn = document.getElementById('menu-voice-settings-btn');
+    const closeVoiceSettingsModalBtn = document.getElementById('close-voice-settings-modal');
+    const enablePushToTalkCheckbox = document.getElementById('enable-push-to-talk');
+    const pttKeybindDisplay = document.getElementById('ptt-keybind-display');
+    const setPttKeybindBtn = document.getElementById('set-ptt-keybind-btn');
+    const pttKeybindGroup = document.getElementById('ptt-keybind-group');
+    
     // Profile settings elements
     const profileSettingsModal = document.getElementById('profile-settings-modal');
     const menuProfileBtn = document.getElementById('menu-profile-btn');
@@ -4065,6 +4074,17 @@
         voiceStatusText.textContent = statusText;
         voiceControls.classList.remove('hidden');
         
+        // Update mute button based on PTT mode
+        if (voiceChat) {
+            if (voiceChat.isPushToTalkEnabled) {
+                muteBtn.textContent = '🔇';
+                muteBtn.title = `Push-to-Talk (${voiceChat.pttKeyDisplayName})`;
+            } else {
+                muteBtn.textContent = voiceChat.isMuted ? '🔇' : '🎤';
+                muteBtn.title = voiceChat.isMuted ? 'Unmute' : 'Mute';
+            }
+        }
+        
         // Apply layout changes for call UI
         mainContainer.classList.add('in-voice-call');
         videoCallArea.classList.remove('hidden');
@@ -4086,6 +4106,13 @@
     // Voice control event listeners
     muteBtn.addEventListener('click', () => {
         if (voiceChat) {
+            // In PTT mode, clicking mute button should disable PTT
+            if (voiceChat.isPushToTalkEnabled) {
+                voiceChat.setPushToTalkEnabled(false);
+                enablePushToTalkCheckbox.checked = false;
+                pttKeybindGroup.style.display = 'none';
+            }
+            
             const muted = voiceChat.toggleMute();
             muteBtn.textContent = muted ? '🔇' : '🎤';
             muteBtn.title = muted ? 'Unmute' : 'Mute';
@@ -4475,6 +4502,119 @@
                     notificationManager.stopCallSound();
                 }
             }, CALL_SOUND_TEST_DURATION);
+        }
+    });
+    
+    // Voice settings handlers
+    menuVoiceSettingsBtn.addEventListener('click', () => {
+        userMenu.classList.add('hidden');
+        voiceSettingsModal.classList.remove('hidden');
+        
+        // Load current settings
+        if (voiceChat) {
+            enablePushToTalkCheckbox.checked = voiceChat.isPushToTalkEnabled;
+            pttKeybindDisplay.value = voiceChat.pttKeyDisplayName;
+            
+            // Show/hide keybind group based on PTT enabled state
+            pttKeybindGroup.style.display = voiceChat.isPushToTalkEnabled ? 'block' : 'none';
+        }
+    });
+    
+    closeVoiceSettingsModalBtn.addEventListener('click', () => {
+        voiceSettingsModal.classList.add('hidden');
+    });
+    
+    voiceSettingsModal.addEventListener('click', (e) => {
+        if (e.target === voiceSettingsModal) {
+            voiceSettingsModal.classList.add('hidden');
+        }
+    });
+    
+    enablePushToTalkCheckbox.addEventListener('change', (e) => {
+        if (voiceChat) {
+            voiceChat.setPushToTalkEnabled(e.target.checked);
+            
+            // Show/hide keybind group
+            pttKeybindGroup.style.display = e.target.checked ? 'block' : 'none';
+            
+            // Update mute button if in a call
+            const muteBtn = document.querySelector('.voice-controls .btn[title*="Mute"]');
+            if (muteBtn) {
+                if (e.target.checked) {
+                    muteBtn.textContent = '🔇';
+                    muteBtn.title = `Push-to-Talk (${voiceChat.pttKeyDisplayName})`;
+                } else {
+                    muteBtn.textContent = voiceChat.isMuted ? '🔇' : '🎤';
+                    muteBtn.title = voiceChat.isMuted ? 'Unmute' : 'Mute';
+                }
+            }
+        }
+    });
+    
+    // Keybind recording state
+    let isRecordingKeybind = false;
+    
+    setPttKeybindBtn.addEventListener('click', () => {
+        if (!isRecordingKeybind) {
+            isRecordingKeybind = true;
+            setPttKeybindBtn.textContent = 'Press any key...';
+            setPttKeybindBtn.classList.add('btn-primary');
+            pttKeybindDisplay.value = 'Press any key...';
+        }
+    });
+    
+    // Global keydown handler for keybind recording
+    document.addEventListener('keydown', (e) => {
+        // Handle keybind recording
+        if (isRecordingKeybind) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Get a friendly name for the key
+            let keyDisplayName = e.key;
+            if (e.code.startsWith('Key')) {
+                keyDisplayName = e.code.substring(3); // Remove "Key" prefix
+            } else if (e.code.startsWith('Digit')) {
+                keyDisplayName = e.code.substring(5); // Remove "Digit" prefix
+            } else if (e.key === ' ') {
+                keyDisplayName = 'Space';
+            } else if (e.key.length === 1) {
+                keyDisplayName = e.key.toUpperCase();
+            } else {
+                keyDisplayName = e.code;
+            }
+            
+            // Save the keybind
+            if (voiceChat) {
+                voiceChat.setPushToTalkKey(e.code, keyDisplayName);
+                pttKeybindDisplay.value = keyDisplayName;
+            }
+            
+            // Reset recording state
+            isRecordingKeybind = false;
+            setPttKeybindBtn.textContent = 'Change Key';
+            setPttKeybindBtn.classList.remove('btn-primary');
+            return;
+        }
+        
+        // Handle push-to-talk when not recording
+        if (voiceChat && voiceChat.handlePushToTalkKeyDown(e)) {
+            // Only prevent default if we're in a call and the message input is not focused
+            if (document.activeElement !== messageInput) {
+                e.preventDefault();
+            }
+        }
+    });
+    
+    // Global keyup handler for push-to-talk
+    document.addEventListener('keyup', (e) => {
+        if (!isRecordingKeybind && voiceChat) {
+            if (voiceChat.handlePushToTalkKeyUp(e)) {
+                // Only prevent default if we're in a call and the message input is not focused
+                if (document.activeElement !== messageInput) {
+                    e.preventDefault();
+                }
+            }
         }
     });
     
