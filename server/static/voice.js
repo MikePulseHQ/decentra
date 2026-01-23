@@ -62,23 +62,7 @@ class VoiceChat {
             }
 
             // Build audio constraints with noise suppression
-            let audioConstraints = this.selectedMicrophoneId ? 
-                { deviceId: { exact: this.selectedMicrophoneId } } : {};
-            
-            // Apply noise suppression based on setting
-            if (this.noiseSuppression === 'none') {
-                audioConstraints.noiseSuppression = false;
-                audioConstraints.echoCancellation = true; // Keep echo cancellation on
-                audioConstraints.autoGainControl = true; // Keep auto gain control on
-            } else if (this.noiseSuppression === 'medium') {
-                audioConstraints.noiseSuppression = { ideal: true };
-                audioConstraints.echoCancellation = true;
-                audioConstraints.autoGainControl = true;
-            } else { // 'high'
-                audioConstraints.noiseSuppression = true;
-                audioConstraints.echoCancellation = true;
-                audioConstraints.autoGainControl = true;
-            }
+            const audioConstraints = this.buildAudioConstraints(this.selectedMicrophoneId);
             
             const constraints = { 
                 audio: audioConstraints,
@@ -225,23 +209,7 @@ class VoiceChat {
             const oldStream = this.localStream;
             
             // Build audio constraints with noise suppression
-            let audioConstraints = deviceId ? 
-                { deviceId: { exact: deviceId } } : {};
-            
-            // Apply noise suppression based on setting
-            if (this.noiseSuppression === 'none') {
-                audioConstraints.noiseSuppression = false;
-                audioConstraints.echoCancellation = true;
-                audioConstraints.autoGainControl = true;
-            } else if (this.noiseSuppression === 'medium') {
-                audioConstraints.noiseSuppression = { ideal: true };
-                audioConstraints.echoCancellation = true;
-                audioConstraints.autoGainControl = true;
-            } else { // 'high'
-                audioConstraints.noiseSuppression = true;
-                audioConstraints.echoCancellation = true;
-                audioConstraints.autoGainControl = true;
-            }
+            const audioConstraints = this.buildAudioConstraints(deviceId);
             
             const constraints = { 
                 audio: audioConstraints,
@@ -1175,6 +1143,29 @@ class VoiceChat {
     }
     
     // Noise suppression methods
+    buildAudioConstraints(deviceId = null) {
+        // Build audio constraints with device and noise suppression settings
+        let audioConstraints = deviceId ? 
+            { deviceId: { exact: deviceId } } : {};
+        
+        // Apply noise suppression based on setting
+        if (this.noiseSuppression === 'none') {
+            audioConstraints.noiseSuppression = false;
+            audioConstraints.echoCancellation = true; // Keep echo cancellation on
+            audioConstraints.autoGainControl = true; // Keep auto gain control on
+        } else if (this.noiseSuppression === 'medium') {
+            audioConstraints.noiseSuppression = { ideal: true };
+            audioConstraints.echoCancellation = true;
+            audioConstraints.autoGainControl = true;
+        } else { // 'high'
+            audioConstraints.noiseSuppression = true;
+            audioConstraints.echoCancellation = true;
+            audioConstraints.autoGainControl = true;
+        }
+        
+        return audioConstraints;
+    }
+    
     loadNoiseSuppressionSettings() {
         const noiseSuppression = localStorage.getItem('noiseSuppression');
         if (noiseSuppression && ['none', 'medium', 'high'].includes(noiseSuppression)) {
@@ -1200,23 +1191,7 @@ class VoiceChat {
             const oldStream = this.localStream;
             
             // Build audio constraints with new noise suppression setting
-            let audioConstraints = this.selectedMicrophoneId ? 
-                { deviceId: { exact: this.selectedMicrophoneId } } : {};
-            
-            // Apply noise suppression based on setting
-            if (level === 'none') {
-                audioConstraints.noiseSuppression = false;
-                audioConstraints.echoCancellation = true;
-                audioConstraints.autoGainControl = true;
-            } else if (level === 'medium') {
-                audioConstraints.noiseSuppression = { ideal: true };
-                audioConstraints.echoCancellation = true;
-                audioConstraints.autoGainControl = true;
-            } else { // 'high'
-                audioConstraints.noiseSuppression = true;
-                audioConstraints.echoCancellation = true;
-                audioConstraints.autoGainControl = true;
-            }
+            const audioConstraints = this.buildAudioConstraints(this.selectedMicrophoneId);
             
             const constraints = { 
                 audio: audioConstraints,
