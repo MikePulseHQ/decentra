@@ -840,13 +840,26 @@ async def handler(websocket):
                         }))
                         continue
                     
+                    # Validate TOTP code format (6 digits) or backup code format (8 alphanumeric)
+                    if not (totp_code.isdigit() and len(totp_code) == 6) and not (totp_code.isalnum() and len(totp_code) == 8):
+                        await websocket.send_str(json.dumps({
+                            'type': 'auth_error',
+                            'message': 'Invalid two-factor authentication code format'
+                        }))
+                        continue
+                    
                     # Verify 2FA token or backup code
                     valid_code = False
-                    if verify_2fa_token(twofa_data['secret'], totp_code):
-                        valid_code = True
-                    elif db.use_backup_code(username, totp_code):
-                        valid_code = True
-                        print(f"[{datetime.now().strftime('%H:%M:%S')}] User {username} used backup code for 2FA")
+                    if totp_code.isdigit() and len(totp_code) == 6:
+                        # Try TOTP verification
+                        if verify_2fa_token(twofa_data['secret'], totp_code):
+                            valid_code = True
+                    
+                    if not valid_code and totp_code.isalnum() and len(totp_code) == 8:
+                        # Try backup code
+                        if db.use_backup_code(username, totp_code):
+                            valid_code = True
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] User {username} used backup code for 2FA")
                     
                     if not valid_code:
                         await websocket.send_str(json.dumps({
@@ -3651,6 +3664,8 @@ async def cleanup_reset_tokens_periodically():
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Cleaned up expired reset tokens")
         except Exception as e:
             print(f"Error in reset token cleanup task: {e}")
+
+
 async def cleanup_old_messages_periodically():
     """Periodic task to clean up old messages based on purge schedules."""
     while True:

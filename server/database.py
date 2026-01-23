@@ -9,6 +9,7 @@ import psycopg2.extras
 import json
 import os
 import time
+import secrets
 from datetime import datetime
 from contextlib import contextmanager
 from typing import List, Dict, Set, Optional, Tuple
@@ -779,8 +780,8 @@ class Database:
                 cursor = conn.cursor()
                 cursor.execute('''
                     INSERT INTO password_reset_tokens (token, username, created_at, expires_at, used)
-                    VALUES (%s, %s, %s, %s, %s)
-                ''', (token, username, datetime.now(), expires_at, False))
+                    VALUES (%s, %s, CURRENT_TIMESTAMP, %s, %s)
+                ''', (token, username, expires_at, False))
                 return True
         except Exception:
             return False
@@ -909,7 +910,15 @@ class Database:
 
                 original_backup_codes = result['backup_codes'] or ''
                 backup_codes = original_backup_codes.split(',') if original_backup_codes else []
-                if code not in backup_codes:
+                
+                # Use constant-time comparison to prevent timing attacks
+                found = False
+                for backup_code in backup_codes:
+                    if secrets.compare_digest(code, backup_code):
+                        found = True
+                        break
+                
+                if not found:
                     return False
 
                 # Remove the used code
