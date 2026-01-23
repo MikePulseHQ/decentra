@@ -205,7 +205,6 @@ class VoiceChat {
         
         // If already in a call, restart the stream with the new device
         if (this.localStream) {
-            const wasInVoice = this.currentVoiceChannel !== null;
             const oldStream = this.localStream;
             
             // Build audio constraints with noise suppression
@@ -1187,7 +1186,6 @@ class VoiceChat {
         
         // If we're already in a call, restart the audio stream with new settings
         if (this.localStream) {
-            const wasInVoice = this.currentVoiceChannel !== null || this.inDirectCall;
             const oldStream = this.localStream;
             
             // Build audio constraints with new noise suppression setting
