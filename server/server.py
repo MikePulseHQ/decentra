@@ -1965,14 +1965,20 @@ async def handler(websocket):
                         # Verify 2FA code or backup code
                         twofa_data = db.get_2fa_secret(username)
                         if twofa_data and twofa_data.get('enabled'):
-                            valid_code = False
-                            if totp_code:
-                                if verify_2fa_token(twofa_data['secret'], totp_code):
-                                    valid_code = True
-                                elif db.use_backup_code(username, totp_code):
-                                    valid_code = True
+                            if not totp_code:
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': '2FA code or backup code required to disable 2FA'
+                                }))
+                                continue
                             
-                            if not valid_code and totp_code:
+                            valid_code = False
+                            if verify_2fa_token(twofa_data['secret'], totp_code):
+                                valid_code = True
+                            elif db.use_backup_code(username, totp_code):
+                                valid_code = True
+                            
+                            if not valid_code:
                                 await websocket.send_str(json.dumps({
                                     'type': 'error',
                                     'message': 'Invalid 2FA code'

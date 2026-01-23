@@ -285,7 +285,7 @@ This is an automated message from {server_name}.
         
         return self.send_email(to_email, subject, body_text, body_html)
     
-    def send_password_reset_email(self, to_email: str, username: str, reset_token: str, server_name: str = "Decentra") -> bool:
+    def send_password_reset_email(self, to_email: str, username: str, reset_token: str, server_name: str = "Decentra", base_url: str = None) -> bool:
         """
         Send a password reset email with a reset link.
         
@@ -294,6 +294,8 @@ This is an automated message from {server_name}.
             username: Username requesting the reset
             reset_token: Unique token for password reset
             server_name: Name of the server (default: "Decentra")
+            base_url: Base URL for the reset link (e.g., "https://example.com")
+                     If not provided, uses localhost:8765
             
         Returns:
             True if email was sent successfully, False otherwise
@@ -301,9 +303,12 @@ This is an automated message from {server_name}.
         if not self.is_configured():
             return False
         
-        # For local/self-hosted instances, use a generic reset URL
-        # In production, this should be the actual domain
-        reset_url = f"https://localhost:8765/reset-password?token={reset_token}"
+        # Use provided base URL or fall back to localhost
+        # In production, base_url should be set via environment variable or admin settings
+        if not base_url:
+            base_url = os.environ.get('DECENTRA_BASE_URL', 'https://localhost:8765')
+        
+        reset_url = f"{base_url}/reset-password?token={reset_token}"
         
         subject = f"Password Reset - {server_name}"
         

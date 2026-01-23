@@ -784,8 +784,8 @@ class Database:
                 cursor = conn.cursor()
                 cursor.execute('''
                     DELETE FROM password_reset_tokens 
-                    WHERE expires_at <= %s OR used = TRUE
-                ''', (datetime.now(),))
+                    WHERE expires_at <= CURRENT_TIMESTAMP OR used = TRUE
+                ''')
         except Exception as e:
             print(f"Error cleaning up expired reset tokens: {e}")
     
