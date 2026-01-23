@@ -851,8 +851,74 @@
                 else if (!joinServerModal.classList.contains('hidden')) {
                     joinServerError.textContent = data.message;
                     joinServerError.classList.remove('hidden');
+                }
+                // Show error in 2FA setup modal if it's open
+                else if (twoFASetupModal && !twoFASetupModal.classList.contains('hidden')) {
+                    const errorEl = document.getElementById('2fa-error');
+                    if (errorEl) {
+                        errorEl.textContent = data.message;
+                        errorEl.classList.remove('hidden');
+                    }
+                }
+                // Show error in 2FA disable modal if it's open
+                else if (twoFADisableModal && !twoFADisableModal.classList.contains('hidden')) {
+                    const errorEl = document.getElementById('2fa-disable-error');
+                    if (errorEl) {
+                        errorEl.textContent = data.message;
+                        errorEl.classList.remove('hidden');
+                    }
                 } else {
                     alert(data.message);
+                }
+                break;
+            
+            case '2fa_status':
+                update2FADisplay(data.enabled);
+                break;
+            
+            case '2fa_setup':
+                // Display QR code and backup codes
+                current2FASecret = data.secret;
+                current2FABackupCodes = data.backup_codes;
+                
+                // Display QR code
+                document.getElementById('qr-code-img').src = data.qr_code;
+                document.getElementById('manual-secret').textContent = data.secret;
+                
+                // Display backup codes
+                const backupCodesContainer = document.getElementById('backup-codes-container');
+                backupCodesContainer.innerHTML = data.backup_codes.map((code, i) => 
+                    `<div style="margin: 5px 0;">${i + 1}. ${code}</div>`
+                ).join('');
+                break;
+            
+            case '2fa_enabled':
+                // 2FA successfully enabled
+                twoFASetupModal.classList.add('hidden');
+                profileSettingsModal.classList.remove('hidden');
+                alert('Two-factor authentication has been enabled successfully!');
+                load2FAStatus();
+                break;
+            
+            case '2fa_disabled':
+                // 2FA successfully disabled
+                twoFADisableModal.classList.add('hidden');
+                profileSettingsModal.classList.remove('hidden');
+                alert('Two-factor authentication has been disabled.');
+                load2FAStatus();
+                break;
+            
+            case 'attachment_deleted':
+                // Remove attachment from UI
+                const attachmentWrapper = document.querySelector(`.attachment-wrapper[data-attachment-id="${data.attachment_id}"]`);
+                if (attachmentWrapper) {
+                    attachmentWrapper.remove();
+                    
+                    // If this was the last attachment, remove the entire attachments container
+                    const attachmentsDiv = document.querySelector(`.message[data-message-id="${data.message_id}"] .message-attachments`);
+                    if (attachmentsDiv && attachmentsDiv.children.length === 0) {
+                        attachmentsDiv.remove();
+                    }
                 }
                 break;
             
@@ -2145,6 +2211,11 @@
                     const filename = attachment.filename || 'file';
                     const contentType = attachment.content_type || '';
                     
+                    // Create wrapper for attachment with delete button
+                    const attachmentWrapper = document.createElement('div');
+                    attachmentWrapper.className = 'attachment-wrapper';
+                    attachmentWrapper.setAttribute('data-attachment-id', attachmentId);
+                    
                     // Check if this is a media file that should be embedded
                     // Reuse existing regex patterns for consistency
                     const isImage = contentType.startsWith('image/') || IMAGE_EXTENSIONS.test(filename);
@@ -2168,7 +2239,7 @@
                         };
                         
                         videoEmbed.appendChild(video);
-                        attachmentsDiv.appendChild(videoEmbed);
+                        attachmentWrapper.appendChild(videoEmbed);
                     } else if (isImage) {
                         // Create embedded image
                         const imageEmbed = document.createElement('div');
@@ -2186,11 +2257,27 @@
                         };
                         
                         imageEmbed.appendChild(img);
-                        attachmentsDiv.appendChild(imageEmbed);
+                        attachmentWrapper.appendChild(imageEmbed);
                     } else {
                         // Create download link for other files
-                        attachmentsDiv.appendChild(createAttachmentDownloadLink(downloadUrl, filename, attachment.file_size));
+                        attachmentWrapper.appendChild(createAttachmentDownloadLink(downloadUrl, filename, attachment.file_size));
                     }
+                    
+                    // Add delete button
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'attachment-delete-btn';
+                    deleteBtn.innerHTML = '🗑️';
+                    deleteBtn.title = 'Delete attachment';
+                    deleteBtn.setAttribute('data-attachment-id', attachmentId);
+                    deleteBtn.setAttribute('data-message-id', messageId);
+                    deleteBtn.onclick = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        showDeleteAttachmentConfirmation(attachmentId, filename);
+                    };
+                    attachmentWrapper.appendChild(deleteBtn);
+                    
+                    attachmentsDiv.appendChild(attachmentWrapper);
                 }
                 
                 container.appendChild(attachmentsDiv);
@@ -4710,6 +4797,9 @@
         // Always initialize fields to avoid stale values if currentUserProfile is missing
         statusMessageInput.value = (window.currentUserProfile && window.currentUserProfile.status_message) || '';
         bioInput.value = (window.currentUserProfile && window.currentUserProfile.bio) || '';
+        
+        // Load 2FA status
+        load2FAStatus();
     });
     
     closeProfileModalBtn.addEventListener('click', () => {
@@ -6065,6 +6155,213 @@
     // Debounce resize handler to improve performance
     window.addEventListener('resize', debounce(updateMobileMenu, 150));
     updateMobileMenu();
+    
+    
+    // 2FA Settings Functions
+    let current2FASecret = '';
+    let current2FABackupCodes = [];
+    let current2FAStep = 1;
+    
+    function load2FAStatus() {
+        ws.send(JSON.stringify({
+            type: 'get_2fa_status'
+        }));
+    }
+    
+    function update2FADisplay(enabled) {
+        const statusEl = document.getElementById('2fa-status');
+        const setupBtn = document.getElementById('setup-2fa-btn');
+        const disableBtn = document.getElementById('disable-2fa-btn');
+        
+        if (enabled) {
+            statusEl.textContent = '✓ Two-factor authentication is enabled';
+            statusEl.style.color = '#43b581';
+            setupBtn.style.display = 'none';
+            disableBtn.style.display = 'inline-block';
+        } else {
+            statusEl.textContent = 'Two-factor authentication is not enabled';
+            statusEl.style.color = '#b9bbbe';
+            setupBtn.style.display = 'inline-block';
+            disableBtn.style.display = 'none';
+        }
+    }
+    
+    // 2FA Setup Modal Elements
+    const setup2FABtn = document.getElementById('setup-2fa-btn');
+    const disable2FABtn = document.getElementById('disable-2fa-btn');
+    const twoFASetupModal = document.getElementById('2fa-setup-modal');
+    const twoFADisableModal = document.getElementById('2fa-disable-modal');
+    const twoFANextBtn = document.getElementById('2fa-next-btn');
+    const twoFABackBtn = document.getElementById('2fa-back-btn');
+    const twoFACancelBtn = document.getElementById('2fa-cancel-btn');
+    
+    if (setup2FABtn) {
+        setup2FABtn.addEventListener('click', () => {
+            profileSettingsModal.classList.add('hidden');
+            twoFASetupModal.classList.remove('hidden');
+            current2FAStep = 1;
+            show2FAStep(1);
+            
+            // Request 2FA setup from server
+            ws.send(JSON.stringify({
+                type: 'setup_2fa'
+            }));
+        });
+    }
+    
+    if (disable2FABtn) {
+        disable2FABtn.addEventListener('click', () => {
+            profileSettingsModal.classList.add('hidden');
+            twoFADisableModal.classList.remove('hidden');
+            document.getElementById('2fa-disable-password').value = '';
+            document.getElementById('2fa-disable-code').value = '';
+            document.getElementById('2fa-disable-error').classList.add('hidden');
+        });
+    }
+    
+    if (twoFANextBtn) {
+        twoFANextBtn.addEventListener('click', () => {
+            if (current2FAStep === 1) {
+                // Move to backup codes
+                current2FAStep = 2;
+                show2FAStep(2);
+            } else if (current2FAStep === 2) {
+                // Move to verification
+                current2FAStep = 3;
+                show2FAStep(3);
+            } else if (current2FAStep === 3) {
+                // Verify and enable 2FA
+                const code = document.getElementById('2fa-verify-code').value.trim();
+                if (!code || code.length !== 6) {
+                    document.getElementById('2fa-error').textContent = 'Please enter a valid 6-digit code';
+                    document.getElementById('2fa-error').classList.remove('hidden');
+                    return;
+                }
+                
+                ws.send(JSON.stringify({
+                    type: 'verify_2fa_setup',
+                    code: code
+                }));
+            }
+        });
+    }
+    
+    if (twoFABackBtn) {
+        twoFABackBtn.addEventListener('click', () => {
+            if (current2FAStep > 1) {
+                current2FAStep--;
+                show2FAStep(current2FAStep);
+            }
+        });
+    }
+    
+    if (twoFACancelBtn) {
+        twoFACancelBtn.addEventListener('click', () => {
+            twoFASetupModal.classList.add('hidden');
+            profileSettingsModal.classList.remove('hidden');
+        });
+    }
+    
+    function show2FAStep(step) {
+        // Hide all steps
+        document.querySelectorAll('.2fa-step').forEach(el => {
+            el.style.display = 'none';
+        });
+        
+        // Show current step
+        document.getElementById('2fa-setup-step' + step).style.display = 'block';
+        
+        // Update buttons
+        if (step === 1) {
+            twoFANextBtn.textContent = 'Next';
+            twoFABackBtn.style.display = 'none';
+        } else if (step === 2) {
+            twoFANextBtn.textContent = 'Next';
+            twoFABackBtn.style.display = 'inline-block';
+        } else if (step === 3) {
+            twoFANextBtn.textContent = 'Enable 2FA';
+            twoFABackBtn.style.display = 'inline-block';
+            document.getElementById('2fa-verify-code').focus();
+        }
+    }
+    
+    // Download backup codes
+    const downloadBackupCodesBtn = document.getElementById('download-backup-codes-btn');
+    if (downloadBackupCodesBtn) {
+        downloadBackupCodesBtn.addEventListener('click', () => {
+            const text = 'Decentra 2FA Backup Codes\n\n' + current2FABackupCodes.join('\n') + '\n\nKeep these codes safe. Each can only be used once.';
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'decentra-backup-codes.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    }
+    
+    // 2FA Disable handlers
+    const twoFADisableConfirmBtn = document.getElementById('2fa-disable-confirm-btn');
+    const twoFADisableCancelBtn = document.getElementById('2fa-disable-cancel-btn');
+    
+    if (twoFADisableConfirmBtn) {
+        twoFADisableConfirmBtn.addEventListener('click', () => {
+            const password = document.getElementById('2fa-disable-password').value;
+            const code = document.getElementById('2fa-disable-code').value.trim();
+            
+            if (!password || !code) {
+                document.getElementById('2fa-disable-error').textContent = 'Password and code are required';
+                document.getElementById('2fa-disable-error').classList.remove('hidden');
+                return;
+            }
+            
+            ws.send(JSON.stringify({
+                type: 'disable_2fa',
+                password: password,
+                code: code
+            }));
+        });
+    }
+    
+    if (twoFADisableCancelBtn) {
+        twoFADisableCancelBtn.addEventListener('click', () => {
+            twoFADisableModal.classList.add('hidden');
+            profileSettingsModal.classList.remove('hidden');
+        });
+    }
+    
+    
+    // Attachment Deletion Functions
+    let deleteAttachmentId = null;
+    const deleteAttachmentModal = document.getElementById('delete-attachment-modal');
+    const deleteAttachmentConfirmBtn = document.getElementById('delete-attachment-confirm-btn');
+    const deleteAttachmentCancelBtn = document.getElementById('delete-attachment-cancel-btn');
+    
+    function showDeleteAttachmentConfirmation(attachmentId, filename) {
+        deleteAttachmentId = attachmentId;
+        document.getElementById('delete-attachment-filename').textContent = filename;
+        deleteAttachmentModal.classList.remove('hidden');
+    }
+    
+    if (deleteAttachmentConfirmBtn) {
+        deleteAttachmentConfirmBtn.addEventListener('click', () => {
+            if (deleteAttachmentId) {
+                ws.send(JSON.stringify({
+                    type: 'delete_attachment',
+                    attachment_id: deleteAttachmentId
+                }));
+                deleteAttachmentModal.classList.add('hidden');
+                deleteAttachmentId = null;
+            }
+        });
+    }
+    
+    if (deleteAttachmentCancelBtn) {
+        deleteAttachmentCancelBtn.addEventListener('click', () => {
+            deleteAttachmentModal.classList.add('hidden');
+            deleteAttachmentId = null;
+        });
+    }
     
     
     console.log('chat.js: About to call connect()');
