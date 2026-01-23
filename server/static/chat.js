@@ -4537,9 +4537,8 @@
             // Show/hide keybind group
             pttKeybindGroup.style.display = e.target.checked ? 'block' : 'none';
             
-            // Update mute button if in a call
-            const muteBtn = document.querySelector('.voice-controls .btn[title*="Mute"]');
-            if (muteBtn) {
+            // Update mute button if in a call (use the globally defined muteBtn variable)
+            if (muteBtn && !voiceControls.classList.contains('hidden')) {
                 if (e.target.checked) {
                     muteBtn.textContent = '🔇';
                     muteBtn.title = `Push-to-Talk (${voiceChat.pttKeyDisplayName})`;
@@ -4553,6 +4552,21 @@
     
     // Keybind recording state
     let isRecordingKeybind = false;
+    
+    // Helper function to get a user-friendly display name for a keyboard key
+    function getKeyDisplayName(event) {
+        if (event.code.startsWith('Key')) {
+            return event.code.substring(3); // Remove "Key" prefix
+        } else if (event.code.startsWith('Digit')) {
+            return event.code.substring(5); // Remove "Digit" prefix
+        } else if (event.key === ' ') {
+            return 'Space';
+        } else if (event.key.length === 1) {
+            return event.key.toUpperCase();
+        } else {
+            return event.code;
+        }
+    }
     
     setPttKeybindBtn.addEventListener('click', () => {
         if (!isRecordingKeybind) {
@@ -4571,18 +4585,7 @@
             e.stopPropagation();
             
             // Get a friendly name for the key
-            let keyDisplayName = e.key;
-            if (e.code.startsWith('Key')) {
-                keyDisplayName = e.code.substring(3); // Remove "Key" prefix
-            } else if (e.code.startsWith('Digit')) {
-                keyDisplayName = e.code.substring(5); // Remove "Digit" prefix
-            } else if (e.key === ' ') {
-                keyDisplayName = 'Space';
-            } else if (e.key.length === 1) {
-                keyDisplayName = e.key.toUpperCase();
-            } else {
-                keyDisplayName = e.code;
-            }
+            const keyDisplayName = getKeyDisplayName(e);
             
             // Save the keybind
             if (voiceChat) {
@@ -4598,8 +4601,10 @@
         }
         
         // Handle push-to-talk when not recording
+        // handlePushToTalkKeyDown checks internally if PTT is enabled and user is in a call
         if (voiceChat && voiceChat.handlePushToTalkKeyDown(e)) {
-            // Only prevent default if we're in a call and the message input is not focused
+            // Prevent default action if message input is not focused
+            // (allows PTT key to work in chat without triggering other actions)
             if (document.activeElement !== messageInput) {
                 e.preventDefault();
             }
@@ -4610,7 +4615,7 @@
     document.addEventListener('keyup', (e) => {
         if (!isRecordingKeybind && voiceChat) {
             if (voiceChat.handlePushToTalkKeyUp(e)) {
-                // Only prevent default if we're in a call and the message input is not focused
+                // Prevent default action if message input is not focused
                 if (document.activeElement !== messageInput) {
                     e.preventDefault();
                 }

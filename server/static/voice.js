@@ -963,7 +963,8 @@ class VoiceChat {
     }
     
     toggleMute() {
-        // Don't toggle if push-to-talk is enabled and actively being used
+        // Prevent toggle while actively transmitting in PTT mode
+        // (User should release PTT key before using manual mute)
         if (this.isPushToTalkEnabled && this.pushToTalkKeyPressed) {
             return this.isMuted;
         }
@@ -1072,17 +1073,16 @@ class VoiceChat {
                 this.pushToTalkKeyPressed = true;
                 
                 // Unmute when PTT key is pressed
-                if (this.isMuted) {
-                    this.localStream.getAudioTracks().forEach(track => {
-                        track.enabled = true;
-                    });
-                    
-                    // Notify server
-                    this.ws.send(JSON.stringify({
-                        type: 'voice_mute',
-                        muted: false
-                    }));
-                }
+                this.isMuted = false;
+                this.localStream.getAudioTracks().forEach(track => {
+                    track.enabled = true;
+                });
+                
+                // Notify server
+                this.ws.send(JSON.stringify({
+                    type: 'voice_mute',
+                    muted: false
+                }));
             }
             return true; // Indicate that we handled the key
         }
@@ -1100,19 +1100,18 @@ class VoiceChat {
         if (event.code === this.pushToTalkKey || event.key === this.pushToTalkKey) {
             this.pushToTalkKeyPressed = false;
             
-            // Mute when PTT key is released
-            if (!this.isMuted) {
-                this.isMuted = true;
-                this.localStream.getAudioTracks().forEach(track => {
-                    track.enabled = false;
-                });
-                
-                // Notify server
-                this.ws.send(JSON.stringify({
-                    type: 'voice_mute',
-                    muted: true
-                }));
-            }
+            // Always mute when PTT key is released (should always be muted in PTT mode)
+            this.isMuted = true;
+            this.localStream.getAudioTracks().forEach(track => {
+                track.enabled = false;
+            });
+            
+            // Notify server
+            this.ws.send(JSON.stringify({
+                type: 'voice_mute',
+                muted: true
+            }));
+            
             return true; // Indicate that we handled the key
         }
         
