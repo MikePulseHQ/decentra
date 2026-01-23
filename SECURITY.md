@@ -122,10 +122,10 @@ Administrators can configure automatic attachment cleanup:
 
 ### For Users
 
-1. **Use Strong Passwords**: Minimum 8 characters with mixed case, numbers, and symbols
+1. **Use Strong Passwords**: Minimum 6 characters with mixed case, numbers, and symbols
 2. **Enable 2FA**: Add an extra layer of security to your account
 3. **Save Backup Codes**: Store them in a password manager or secure location
-4. **Verify Email**: Complete email verification to enable password reset
+4: **Verify Email**: Complete email verification to enable password reset
 5. **Keep Software Updated**: Use the latest version of Decentra
 
 ### For Administrators
