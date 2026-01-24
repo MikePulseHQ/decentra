@@ -2311,7 +2311,7 @@
                     // Add delete button
                     const deleteBtn = document.createElement('button');
                     deleteBtn.className = 'attachment-delete-btn';
-                    deleteBtn.innerHTML = '🗑️';
+                    deleteBtn.textContent = '🗑️';
                     deleteBtn.title = 'Delete attachment';
                     deleteBtn.setAttribute('data-attachment-id', attachmentId);
                     deleteBtn.setAttribute('data-message-id', messageId);
