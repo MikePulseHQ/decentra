@@ -489,6 +489,17 @@
             if (protocol === 'http:' || protocol === 'https:') {
                 // Require the URL to use the same origin as the current page
                 if (parsed.origin === window.location.origin) {
+                    const path = parsed.pathname || '';
+                    // Basic path-based allowlist for image resources:
+                    // - must be an absolute path
+                    // - must not contain characters that could break out of attributes/HTML
+                    //   (this is defense in depth; such characters are unusual in paths)
+                    if (!path.startsWith('/')) {
+                        return false;
+                    }
+                    if (/[<>"'`]/.test(path)) {
+                        return false;
+                    }
                     return true;
                 }
                 return false;
