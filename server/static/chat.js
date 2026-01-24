@@ -485,9 +485,16 @@
             // Support relative URLs by resolving against current location
             const parsed = new URL(url, window.location.href);
             const protocol = parsed.protocol.toLowerCase();
-            // Allow common safe protocols only
-            if (protocol === 'http:' || protocol === 'https:' || protocol === 'data:') {
+            // Allow only data URLs or same-origin http/https URLs
+            if (protocol === 'data:') {
                 return true;
+            }
+            if (protocol === 'http:' || protocol === 'https:') {
+                // Require the URL to use the same origin as the current page
+                if (parsed.origin === window.location.origin) {
+                    return true;
+                }
+                return false;
             }
             return false;
         } catch (e) {
