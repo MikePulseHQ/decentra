@@ -18,6 +18,9 @@ import os
 import base64
 import hashlib
 import jwt
+import pyotp
+import qrcode
+import io
 from database import Database
 from api import setup_api_routes
 from email_utils import EmailSender
@@ -75,6 +78,14 @@ JWT_EXPIRATION_HOURS = 24  # Token expires after 24 hours
 # For production environments with multiple server instances, consider using Redis or a database table.
 pending_signups = {}
 
+# Rate limiting for password reset requests (in-memory)
+# Format: {identifier: [timestamp1, timestamp2, ...]}
+# NOTE: This is an in-memory store and will be cleared on server restart.
+# For production environments with multiple server instances, consider using Redis or a database table.
+password_reset_attempts = {}
+PASSWORD_RESET_MAX_ATTEMPTS = 3  # Maximum attempts per time window
+PASSWORD_RESET_TIME_WINDOW = 3600  # Time window in seconds (1 hour)
+
 # Store connected clients: {websocket: username}
 clients = {}
 # Store message history (deprecated - now per server/channel)
@@ -121,6 +132,50 @@ def verify_password(password, password_hash):
     return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
 
 
+def generate_2fa_secret():
+    """Generate a new 2FA secret."""
+    return pyotp.random_base32()
+
+
+def generate_backup_codes(count=10):
+    """Generate backup codes for 2FA."""
+    codes = []
+    for _ in range(count):
+        # Generate 8-character alphanumeric code
+        code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        codes.append(code)
+    return codes
+
+
+def verify_2fa_token(secret, token):
+    """Verify a 2FA token."""
+    totp = pyotp.TOTP(secret)
+    # Allow for 1 time step before and after for clock drift
+    return totp.verify(token, valid_window=1)
+
+
+def generate_qr_code_base64(username, secret, issuer_name="Decentra"):
+    """Generate a QR code for 2FA setup."""
+    # Create provisioning URI
+    totp = pyotp.TOTP(secret)
+    uri = totp.provisioning_uri(name=username, issuer_name=issuer_name)
+    
+    # Generate QR code
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(uri)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    # Convert to base64
+    buffer = io.BytesIO()
+    img.save(buffer, format='PNG')
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode()
+    
+    return f"data:image/png;base64,{img_base64}"
+
+
 def generate_jwt_token(username):
     """Generate a JWT token for a user."""
     now = datetime.now(timezone.utc)
@@ -163,6 +218,42 @@ def verify_jwt_token(token):
         return None  # Token has expired
     except jwt.InvalidTokenError:
         return None  # Invalid token
+
+
+def check_password_reset_rate_limit(identifier: str) -> bool:
+    """
+    Check if a password reset request should be allowed based on rate limiting.
+    
+    Args:
+        identifier: Username or email requesting password reset
+        
+    Returns:
+        True if request is allowed, False if rate limit exceeded
+    """
+    current_time = datetime.now(timezone.utc)
+    
+    # Clean up old attempts outside the time window
+    if identifier in password_reset_attempts:
+        password_reset_attempts[identifier] = [
+            timestamp for timestamp in password_reset_attempts[identifier]
+            if (current_time - timestamp).total_seconds() < PASSWORD_RESET_TIME_WINDOW
+        ]
+        
+        # Remove empty lists to keep memory clean
+        if not password_reset_attempts[identifier]:
+            del password_reset_attempts[identifier]
+    
+    # Check if rate limit is exceeded
+    attempts = password_reset_attempts.get(identifier, [])
+    if len(attempts) >= PASSWORD_RESET_MAX_ATTEMPTS:
+        return False
+    
+    # Record this attempt
+    if identifier not in password_reset_attempts:
+        password_reset_attempts[identifier] = []
+    password_reset_attempts[identifier].append(current_time)
+    
+    return True
 
 
 def is_valid_email(email):
@@ -758,6 +849,7 @@ async def handler(websocket):
             elif auth_data.get('type') == 'login':
                 username = auth_data.get('username', '').strip()
                 password = auth_data.get('password', '')
+                totp_code = auth_data.get('totp_code', '').strip()  # Optional 2FA code
                 
                 if not username or not password:
                     await websocket.send_str(json.dumps({
@@ -780,6 +872,45 @@ async def handler(websocket):
                         'message': 'Invalid username or password'
                     }))
                     continue
+                
+                # Check if 2FA is enabled
+                twofa_data = db.get_2fa_secret(username)
+                if twofa_data and twofa_data.get('enabled'):
+                    # 2FA is enabled, need to verify code
+                    if not totp_code:
+                        await websocket.send_str(json.dumps({
+                            'type': '2fa_required',
+                            'message': 'Two-factor authentication code required'
+                        }))
+                        continue
+                    
+                    # Validate TOTP code format (6 digits) or backup code format (8 alphanumeric)
+                    if not (totp_code.isdigit() and len(totp_code) == 6) and not (totp_code.isalnum() and len(totp_code) == 8):
+                        await websocket.send_str(json.dumps({
+                            'type': 'auth_error',
+                            'message': 'Invalid two-factor authentication code format'
+                        }))
+                        continue
+                    
+                    # Verify 2FA token or backup code
+                    valid_code = False
+                    if totp_code.isdigit() and len(totp_code) == 6:
+                        # Try TOTP verification
+                        if verify_2fa_token(twofa_data['secret'], totp_code):
+                            valid_code = True
+                    
+                    if not valid_code and totp_code.isalnum() and len(totp_code) == 8:
+                        # Try backup code
+                        if db.use_backup_code(username, totp_code):
+                            valid_code = True
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] User {username} used backup code for 2FA")
+                    
+                    if not valid_code:
+                        await websocket.send_str(json.dumps({
+                            'type': 'auth_error',
+                            'message': 'Invalid two-factor authentication code'
+                        }))
+                        continue
                 
                 # Generate JWT token for the user
                 token = generate_jwt_token(username)
@@ -833,6 +964,158 @@ async def handler(websocket):
                 authenticated = True
                 clients[websocket] = username
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] User authenticated via token: {username}")
+            
+            # Handle password reset request
+            elif auth_data.get('type') == 'request_password_reset':
+                identifier = auth_data.get('identifier', '').strip()  # Can be username or email
+                
+                if not identifier:
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'Username or email is required'
+                    }))
+                    continue
+                
+                # Check rate limiting to prevent abuse
+                if not check_password_reset_rate_limit(identifier):
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'Too many password reset requests. Please try again later.'
+                    }))
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Rate limit exceeded for password reset: {identifier}")
+                    continue
+                
+                # Try to find user by username or email
+                user = db.get_user(identifier)
+                if not user:
+                    user = db.get_user_by_email(identifier)
+                
+                # Always return success to prevent username/email enumeration
+                if user and user.get('email'):
+                    # Generate reset token
+                    reset_token = secrets.token_urlsafe(32)
+                    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+                    
+                    # Save token to database
+                    if db.create_password_reset_token(user['username'], reset_token, expires_at):
+                        # Send password reset email
+                        email_sender = EmailSender(db.get_admin_settings())
+                        if email_sender.send_password_reset_email(
+                            user['email'], 
+                            user['username'], 
+                            reset_token
+                        ):
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] Password reset email sent to {user['username']}")
+                
+                # Always return success to prevent enumeration attacks
+                await websocket.send_str(json.dumps({
+                    'type': 'password_reset_requested',
+                    'message': 'If an account exists with that email, a password reset link has been sent.'
+                }))
+            
+            # Handle password reset validation
+            elif auth_data.get('type') == 'validate_reset_token':
+                token = auth_data.get('token', '').strip()
+                
+                if not token:
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'Reset token is required'
+                    }))
+                    continue
+                
+                # Get token from database
+                token_data = db.get_password_reset_token(token)
+                
+                if not token_data:
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'Invalid or expired reset token'
+                    }))
+                    continue
+                
+                # Check if token is expired or used
+                if token_data.get('used'):
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'This reset link has already been used'
+                    }))
+                    continue
+                
+                expires_at = datetime.fromisoformat(token_data['expires_at'])
+                if datetime.now(timezone.utc) > expires_at:
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'This reset link has expired'
+                    }))
+                    continue
+                
+                # Token is valid
+                await websocket.send_str(json.dumps({
+                    'type': 'reset_token_valid',
+                    'username': token_data['username']
+                }))
+            
+            # Handle password reset completion
+            elif auth_data.get('type') == 'reset_password':
+                token = auth_data.get('token', '').strip()
+                new_password = auth_data.get('new_password', '')
+                
+                if not token or not new_password:
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'Token and new password are required'
+                    }))
+                    continue
+                
+                # Validate password strength
+                if (
+                    len(new_password) < 8
+                    or not re.search(r"[a-z]", new_password)
+                    or not re.search(r"[A-Z]", new_password)
+                    or not re.search(r"[0-9]", new_password)
+                    or not re.search(r"[^A-Za-z0-9]", new_password)
+                ):
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'Password must be at least 8 characters and include lowercase, uppercase, number, and special character'
+                    }))
+                    continue
+                
+                # Get and validate token
+                token_data = db.get_password_reset_token(token)
+                
+                if not token_data or token_data.get('used'):
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'Invalid or expired reset token'
+                    }))
+                    continue
+                
+                expires_at = datetime.fromisoformat(token_data['expires_at'])
+                if datetime.now(timezone.utc) > expires_at:
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'This reset link has expired'
+                    }))
+                    continue
+                
+                # Update password
+                password_hash = hash_password(new_password)
+                if db.update_user_password(token_data['username'], password_hash):
+                    # Mark token as used
+                    db.mark_reset_token_used(token)
+                    
+                    await websocket.send_str(json.dumps({
+                        'type': 'password_reset_success',
+                        'message': 'Password has been reset successfully'
+                    }))
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Password reset for user: {token_data['username']}")
+                else:
+                    await websocket.send_str(json.dumps({
+                        'type': 'auth_error',
+                        'message': 'Failed to reset password'
+                    }))
             
             else:
                 await websocket.send_str(json.dumps({
@@ -1358,6 +1641,88 @@ async def handler(websocket):
                                 'message': 'Failed to delete message. It may already be deleted.'
                             }))
                     
+                    elif data.get('type') == 'delete_attachment':
+                        attachment_id = data.get('attachment_id')
+                        
+                        if not attachment_id:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'Invalid attachment delete request'
+                            }))
+                            continue
+                        
+                        # Get the attachment to find its message
+                        attachment = db.get_attachment(attachment_id)
+                        if not attachment:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'Attachment not found'
+                            }))
+                            continue
+                        
+                        # Get the message to check permissions
+                        message = db.get_message(attachment['message_id'])
+                        if not message:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'Associated message not found'
+                            }))
+                            continue
+                        
+                        # Check permissions (same logic as message deletion)
+                        can_delete = False
+                        
+                        # Users can always delete attachments from their own messages
+                        if message['username'] == username:
+                            can_delete = True
+                        # Check server permissions for deleting others' attachments
+                        elif message['context_type'] == 'server' and message['context_id']:
+                            server_id = message['context_id'].split('/')[0]
+                            server = db.get_server(server_id)
+                            if server:
+                                # Server owner can delete any attachment
+                                if username == server['owner']:
+                                    can_delete = True
+                                else:
+                                    # Check member permissions
+                                    members = db.get_server_members(server_id)
+                                    for member in members:
+                                        if member['username'] == username:
+                                            can_delete = member.get('can_delete_messages', False)
+                                            break
+                        
+                        if not can_delete:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'You do not have permission to delete this attachment'
+                            }))
+                            continue
+                        
+                        # Delete the attachment
+                        if db.delete_attachment(attachment_id):
+                            # Broadcast the deletion to relevant users
+                            delete_notification = {
+                                'type': 'attachment_deleted',
+                                'attachment_id': attachment_id,
+                                'message_id': attachment['message_id'],
+                                'context_type': message['context_type'],
+                                'context_id': message['context_id']
+                            }
+                            
+                            if message['context_type'] == 'server':
+                                server_id = message['context_id'].split('/')[0]
+                                await broadcast_to_server(server_id, json.dumps(delete_notification))
+                            elif message['context_type'] == 'dm':
+                                # Send to both DM participants
+                                await broadcast_to_dm_participants(username, message['context_id'], json.dumps(delete_notification))
+                            
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] {username} deleted attachment {attachment_id}")
+                        else:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'Failed to delete attachment'
+                            }))
+                    
                     elif data.get('type') == 'search_users':
                         query = data.get('query', '').strip().lower()
                         results = []
@@ -1588,18 +1953,169 @@ async def handler(websocket):
                             'first_user': first_user
                         }))
                     
-                    elif data.get('type') == 'get_admin_settings':
-                        # Verify user is admin
-                        first_user = db.get_first_user()
-                        if username != first_user:
+                    # 2FA Management handlers
+                    elif data.get('type') == 'setup_2fa':
+                        # Generate new 2FA secret
+                        secret = generate_2fa_secret()
+                        backup_codes = generate_backup_codes()
+                        
+                        # Save to database (not enabled yet)
+                        backup_codes_str = ','.join(backup_codes)
+                        if db.create_2fa_secret(username, secret, backup_codes_str):
+                            # Generate QR code
+                            qr_code = generate_qr_code_base64(username, secret)
+                            
+                            # NOTE: The raw 2FA secret is sent only for initial authenticator setup.
+                            # Clients must NOT store this value and should use it solely to configure
+                            # the authenticator app (e.g., via QR code generation) and then discard it.
                             await websocket.send_str(json.dumps({
-                                'type': 'error',
-                                'message': 'Access denied. Admin only.'
+                                'type': '2fa_setup',
+                                'secret': secret,
+                                'qr_code': qr_code,
+                                'backup_codes': backup_codes,
+                                'warning': 'The 2FA secret is sensitive. Do NOT store it; use it only to set up your authenticator app and then discard it.'
                             }))
                         else:
-                            # Load settings from database
-                            settings = db.get_admin_settings()
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'Failed to setup 2FA'
+                            }))
+                    
+                    elif data.get('type') == 'verify_2fa_setup':
+                        # Verify the code and enable 2FA
+                        totp_code = data.get('code', '').strip()
+                        
+                        if not totp_code:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'Verification code required'
+                            }))
+                            continue
+                        
+                        # Get the secret
+                        twofa_data = db.get_2fa_secret(username)
+                        if not twofa_data:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'No 2FA setup found. Please start setup again.'
+                            }))
+                            continue
+                        
+                        # Verify the code
+                        if verify_2fa_token(twofa_data['secret'], totp_code):
+                            # Enable 2FA
+                            if db.enable_2fa(username):
+                                await websocket.send_str(json.dumps({
+                                    'type': '2fa_enabled',
+                                    'message': 'Two-factor authentication enabled successfully'
+                                }))
+                                print(f"[{datetime.now().strftime('%H:%M:%S')}] 2FA enabled for user: {username}")
+                            else:
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': 'Failed to enable 2FA'
+                                }))
+                        else:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'Invalid verification code'
+                            }))
+                    
+                    elif data.get('type') == 'disable_2fa':
+                        # Require password and 2FA code to disable
+                        password = data.get('password', '')
+                        totp_code = data.get('code', '').strip()
+                        
+                        if not password:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'Password required to disable 2FA'
+                            }))
+                            continue
+                        
+                        # Verify password
+                        user = db.get_user(username)
+                        if not user or not verify_password(password, user['password_hash']):
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'Invalid password'
+                            }))
+                            continue
+                        
+                        # Verify 2FA code or backup code
+                        twofa_data = db.get_2fa_secret(username)
+                        if twofa_data and twofa_data.get('enabled'):
+                            if not totp_code:
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': '2FA code or backup code required to disable 2FA'
+                                }))
+                                continue
                             
+                            valid_code = False
+                            if verify_2fa_token(twofa_data['secret'], totp_code):
+                                valid_code = True
+                            elif db.use_backup_code(username, totp_code):
+                                valid_code = True
+                            
+                            if not valid_code:
+                                await websocket.send_str(json.dumps({
+                                    'type': 'error',
+                                    'message': 'Invalid 2FA code'
+                                }))
+                                continue
+                        
+                        # Disable 2FA
+                        if db.disable_2fa(username):
+                            await websocket.send_str(json.dumps({
+                                'type': '2fa_disabled',
+                                'message': 'Two-factor authentication disabled'
+                            }))
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] 2FA disabled for user: {username}")
+                        else:
+                            await websocket.send_str(json.dumps({
+                                'type': 'error',
+                                'message': 'Failed to disable 2FA'
+                            }))
+                    
+                    elif data.get('type') == 'get_2fa_status':
+                        # Get current 2FA status
+                        twofa_data = db.get_2fa_secret(username)
+                        enabled = twofa_data is not None and twofa_data.get('enabled', False)
+                        
+                        await websocket.send_str(json.dumps({
+                            'type': '2fa_status',
+                            'enabled': enabled
+                        }))
+                    
+                    elif data.get('type') == 'get_admin_settings':
+                        # Load settings from database
+                        settings = db.get_admin_settings()
+                        
+                        # Serialize datetime fields to prevent JSON encoding errors
+                        set_at = settings.get('announcement_set_at')
+                        if set_at and hasattr(set_at, 'isoformat'):
+                            settings['announcement_set_at'] = set_at.isoformat()
+                        
+                        # Check if user is admin
+                        first_user = db.get_first_user()
+                        if username != first_user:
+                            # Non-admin users get filtered settings (no sensitive data like SMTP credentials)
+                            filtered_settings = {
+                                'allow_file_attachments': settings.get('allow_file_attachments', True),
+                                'max_attachment_size_mb': settings.get('max_attachment_size_mb', 10),
+                                'max_message_length': settings.get('max_message_length', 2000),
+                                'announcement_enabled': settings.get('announcement_enabled', False),
+                                'announcement_message': settings.get('announcement_message', ''),
+                                'announcement_duration_minutes': settings.get('announcement_duration_minutes', 60),
+                                'announcement_set_at': settings.get('announcement_set_at')
+                            }
+                            await websocket.send_str(json.dumps({
+                                'type': 'admin_settings',
+                                'settings': filtered_settings
+                            }))
+                        else:
+                            # Admin users get all settings
                             await websocket.send_str(json.dumps({
                                 'type': 'admin_settings',
                                 'settings': settings
@@ -3208,6 +3724,17 @@ async def cleanup_old_attachments_periodically():
             print(f"Error in attachment cleanup task: {e}")
 
 
+async def cleanup_reset_tokens_periodically():
+    """Periodic task to clean up expired password reset tokens."""
+    while True:
+        try:
+            await asyncio.sleep(3600)  # Run every hour
+            db.cleanup_expired_reset_tokens()
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Cleaned up expired reset tokens")
+        except Exception as e:
+            print(f"Error in reset token cleanup task: {e}")
+
+
 async def cleanup_old_messages_periodically():
     """Periodic task to clean up old messages based on purge schedules."""
     while True:
@@ -3272,6 +3799,7 @@ async def main():
     # Start periodic cleanup tasks
     asyncio.create_task(cleanup_verification_codes_periodically())
     asyncio.create_task(cleanup_old_attachments_periodically())
+    asyncio.create_task(cleanup_reset_tokens_periodically())
     asyncio.create_task(cleanup_old_messages_periodically())
     
     print("Server started successfully!")
