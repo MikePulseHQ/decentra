@@ -481,6 +481,17 @@
         if (typeof url !== 'string') {
             return false;
         }
+        
+        // Allow data URLs for base64-encoded PNG images (for QR codes)
+        if (url.startsWith('data:image/png;base64,')) {
+            // Validate that it contains only valid base64 characters after the prefix
+            const base64Part = url.substring('data:image/png;base64,'.length);
+            if (/^[A-Za-z0-9+/=]+$/.test(base64Part)) {
+                return true;
+            }
+            return false;
+        }
+        
         try {
             // Support relative URLs by resolving against current location
             const parsed = new URL(url, window.location.href);
@@ -2349,7 +2360,7 @@
                     if (canDeleteAttachment) {
                         const deleteBtn = document.createElement('button');
                         deleteBtn.className = 'attachment-delete-btn';
-                        deleteBtn.innerHTML = '🗑️';
+                        deleteBtn.textContent = '🗑️';
                         deleteBtn.title = 'Delete attachment';
                         deleteBtn.setAttribute('data-attachment-id', attachmentId);
                         deleteBtn.setAttribute('data-message-id', messageId);
@@ -6286,6 +6297,10 @@
             current2FAStep = 1;
             show2FAStep(1);
             
+            // Clear verification code input and error from previous attempts
+            document.getElementById('2fa-verify-code').value = '';
+            document.getElementById('2fa-error').classList.add('hidden');
+            
             // Request 2FA setup from server
             ws.send(JSON.stringify({
                 type: 'setup_2fa'
@@ -6352,6 +6367,12 @@
             el.style.display = 'none';
         });
         
+        // Clear error message when changing steps
+        const errorEl = document.getElementById('2fa-error');
+        if (errorEl) {
+            errorEl.classList.add('hidden');
+        }
+        
         // Show current step
         document.getElementById('2fa-setup-step' + step).style.display = 'block';
         
@@ -6411,6 +6432,34 @@
         twoFADisableCancelBtn.addEventListener('click', () => {
             twoFADisableModal.classList.add('hidden');
             profileSettingsModal.classList.remove('hidden');
+        });
+    }
+    
+    // Click outside to close modals
+    if (twoFASetupModal) {
+        twoFASetupModal.addEventListener('click', (e) => {
+            if (e.target === twoFASetupModal) {
+                twoFASetupModal.classList.add('hidden');
+                profileSettingsModal.classList.remove('hidden');
+            }
+        });
+    }
+    
+    if (twoFADisableModal) {
+        twoFADisableModal.addEventListener('click', (e) => {
+            if (e.target === twoFADisableModal) {
+                twoFADisableModal.classList.add('hidden');
+                profileSettingsModal.classList.remove('hidden');
+            }
+        });
+    }
+    
+    if (deleteAttachmentModal) {
+        deleteAttachmentModal.addEventListener('click', (e) => {
+            if (e.target === deleteAttachmentModal) {
+                deleteAttachmentModal.classList.add('hidden');
+                deleteAttachmentId = null;
+            }
         });
     }
     
