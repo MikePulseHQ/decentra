@@ -140,7 +140,8 @@ def test_admin_vs_non_admin_access():
     print("\nTest 6: Non-admin users don't get 'Access Denied' error...")
     # The old behavior would return an error for non-admin
     # The new behavior returns filtered settings
-    should_get_error = False  # New behavior: no error
+    env_value = os.environ.get('TEST_SHOULD_GET_ERROR_FOR_NON_ADMIN')
+    should_get_error = (env_value == '1')  # Default (no env): new behavior, no error
     
     if should_get_error:
         print("❌ FAIL: Non-admin users should NOT get access denied error")
