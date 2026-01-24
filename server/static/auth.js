@@ -99,6 +99,13 @@
         document.getElementById('reset-email').required = false;
         document.getElementById('new-password').required = false;
         document.getElementById('password').required = true;
+
+        // Ensure username field is cleared and editable when returning to login mode
+        const usernameInput = document.getElementById('username');
+        if (usernameInput) {
+            usernameInput.value = '';
+            usernameInput.readOnly = false;
+        }
     }
     
     function switchToPasswordResetMode() {
