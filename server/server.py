@@ -723,6 +723,7 @@ async def handler(websocket):
                         'type': 'verification_required',
                         'message': 'Verification code sent to your email'
                     }))
+                    continue
                 else:
                     # Email verification is disabled or SMTP not configured - create account immediately
                     # Create user account in database (email not verified)
@@ -763,7 +764,6 @@ async def handler(websocket):
                             'username': username,
                             **new_user_avatar
                         }))
-                continue
             
             # Handle email verification
             elif auth_data.get('type') == 'verify_email':
