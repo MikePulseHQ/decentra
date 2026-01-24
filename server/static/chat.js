@@ -477,6 +477,25 @@
     }
     
     // Handle incoming messages
+    function isSafeImageUrl(url) {
+        if (typeof url !== 'string') {
+            return false;
+        }
+        try {
+            // Support relative URLs by resolving against current location
+            const parsed = new URL(url, window.location.href);
+            const protocol = parsed.protocol.toLowerCase();
+            // Allow common safe protocols only
+            if (protocol === 'http:' || protocol === 'https:' || protocol === 'data:') {
+                return true;
+            }
+            return false;
+        } catch (e) {
+            // Invalid URL
+            return false;
+        }
+    }
+
     function handleMessage(data) {
         switch (data.type) {
             case 'auth_success':
@@ -882,7 +901,13 @@
                 current2FABackupCodes = data.backup_codes;
                 
                 // Display QR code
-                document.getElementById('qr-code-img').src = data.qr_code;
+                const qrCodeImg = document.getElementById('qr-code-img');
+                if (isSafeImageUrl(data.qr_code)) {
+                    qrCodeImg.src = data.qr_code;
+                } else {
+                    console.error('Rejected unsafe QR code URL');
+                    qrCodeImg.removeAttribute('src');
+                }
                 document.getElementById('manual-secret').textContent = data.secret;
                 
                 // Display backup codes (using textContent for security)
