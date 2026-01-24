@@ -655,19 +655,19 @@
                 // Handle periodic data sync - update servers, DMs, and friends
                 console.log('Received data sync');
                 
-                // Update servers list if changed
-                if (data.servers) {
-                    servers = data.servers;
+                // Update servers list if provided
+                if (data.servers !== undefined) {
+                    servers = data.servers || [];
                     updateServersList();
                 }
                 
-                // Update DMs list if changed
-                if (data.dms) {
-                    dms = data.dms;
+                // Update DMs list if provided
+                if (data.dms !== undefined) {
+                    dms = data.dms || [];
                     updateDMsList();
                 }
                 
-                // Update friends lists if changed
+                // Update friends lists if provided
                 if (data.friends !== undefined) {
                     friends = data.friends || [];
                 }
