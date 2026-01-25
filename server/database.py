@@ -184,6 +184,16 @@ class Database:
                         )
                     ''')
                     
+                    # Create index on invite_code for better query performance
+                    cursor.execute('''
+                        CREATE INDEX IF NOT EXISTS idx_invite_usage_invite_code 
+                        ON invite_usage(invite_code)
+                    ''')
+                    cursor.execute('''
+                        CREATE INDEX IF NOT EXISTS idx_invite_usage_server_id 
+                        ON invite_usage(server_id)
+                    ''')
+                    
                     # Admin settings table
                     cursor.execute('''
                         CREATE TABLE IF NOT EXISTS admin_settings (

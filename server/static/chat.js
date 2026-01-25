@@ -3332,10 +3332,16 @@
         
         // Fetch invite usage when switching to invites tab
         if (tabName === 'invites' && currentlySelectedServer) {
-            ws.send(JSON.stringify({
-                type: 'get_server_invite_usage',
-                server_id: currentlySelectedServer
-            }));
+            try {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'get_server_invite_usage',
+                        server_id: currentlySelectedServer
+                    }));
+                }
+            } catch (error) {
+                console.error('Failed to fetch invite usage:', error);
+            }
         }
     }
     
