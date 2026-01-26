@@ -25,6 +25,7 @@ import sys
 import secrets
 import string
 import bcrypt
+import traceback
 
 # Set test encryption key before importing modules that need it
 if 'DECENTRA_ENCRYPTION_KEY' not in os.environ:
@@ -249,7 +250,6 @@ def run_all_tests():
             failed += 1
         except Exception as e:
             print(f"\n❌ ERROR: {e}")
-            import traceback
             traceback.print_exc()
             failed += 1
     
@@ -266,6 +266,5 @@ if __name__ == '__main__':
         sys.exit(0 if success else 1)
     except Exception as e:
         print(f"\n❌ FATAL ERROR: {e}")
-        import traceback
         traceback.print_exc()
         sys.exit(1)
