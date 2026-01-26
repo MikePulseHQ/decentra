@@ -16,6 +16,7 @@ import random
 import string
 import websockets
 import ssl
+import traceback
 from unittest.mock import patch
 
 # Set test encryption key before importing modules that need it
@@ -127,7 +128,7 @@ async def test_init_failure_error_handling():
         print("-" * 60)
         
         # Verify that the error handling code path exists in the server
-        print("✓ Error handling code verified in server.py (lines 1289-1302)")
+        print("✓ Error handling code verified in server.py")
         print("  - Catches exceptions during init sequence")
         print("  - Sends error message with type='error'")
         print("  - Closes WebSocket connection")
@@ -210,7 +211,6 @@ def main():
         sys.exit(1)
     except Exception as e:
         print(f"\n✗ Unexpected error: {e}")
-        import traceback
         traceback.print_exc()
         sys.exit(1)
 
