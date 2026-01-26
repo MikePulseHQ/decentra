@@ -3625,7 +3625,6 @@ async def handler(websocket):
                     print("Invalid JSON received")
                 except Exception as e:
                     print(f"Error processing message: {e}")
-                    import traceback
                     traceback.print_exc()
             elif msg.type == web.WSMsgType.ERROR:
                 print(f'WebSocket connection closed with exception {websocket.exception()}')
