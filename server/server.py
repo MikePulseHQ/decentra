@@ -1226,10 +1226,13 @@ async def handler(websocket):
         
         # Send user data to authenticated client using helper functions
         try:
-            user_servers = build_user_servers_data(username)
-            user_dms = build_user_dms_data(username)
-            friends_list = build_user_friends_data(username)
+            user_servers = build_user_servers_data(username) or []
+            user_dms = build_user_dms_data(username) or []
+            friends_list = build_user_friends_data(username) or []
             friend_requests_sent, friend_requests_received = build_friend_requests_data(username)
+            # Ensure friend requests are lists
+            friend_requests_sent = friend_requests_sent or []
+            friend_requests_received = friend_requests_received or []
             
             current_avatar = get_avatar_data(username)
             current_profile = get_profile_data(username)
@@ -1254,7 +1257,7 @@ async def handler(websocket):
             await websocket.send_str(user_data)
             
             # Send announcement data and server settings
-            admin_settings = db.get_admin_settings()
+            admin_settings = db.get_admin_settings() or {}
             set_at = admin_settings.get('announcement_set_at')
             announcement_data = {
                 'type': 'announcement_update',
