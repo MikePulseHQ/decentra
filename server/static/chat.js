@@ -71,6 +71,7 @@
     const messageInput = document.getElementById('message-input');
     const submitBtn = messageForm.querySelector('button[type="submit"]');
     const chatTitle = document.getElementById('chat-title');
+    const dmCallBtn = document.getElementById('dm-call-btn');
     const attachFileBtn = document.getElementById('attach-file-btn');
     const fileInput = document.getElementById('file-input');
     const attachmentPreview = document.getElementById('attachment-preview');
@@ -1634,18 +1635,8 @@
             const nameSpan = document.createElement('span');
             nameSpan.textContent = dm.username;
             
-            const callBtn = document.createElement('button');
-            callBtn.className = 'btn btn-small btn-icon voice-call-btn';
-            callBtn.textContent = '📞';
-            callBtn.title = 'Voice Call';
-            callBtn.onclick = (e) => {
-                e.stopPropagation();
-                startVoiceCall(dm.username);
-            };
-            
             dmItem.appendChild(avatarEl);
             dmItem.appendChild(nameSpan);
-            dmItem.appendChild(callBtn);
             dmItem.onclick = () => selectDM(dm.id);
             dmsList.appendChild(dmItem);
         });
@@ -2044,6 +2035,11 @@
         
         currentContext = { type: 'server', serverId, channelId };
         
+        // Hide DM call button for channels
+        if (dmCallBtn) {
+            dmCallBtn.classList.add('hidden');
+        }
+        
         // Update UI
         document.querySelectorAll('.channel-item').forEach(item => {
             item.classList.remove('active');
@@ -2074,6 +2070,11 @@
         if (!dm) return;
         
         currentContext = { type: 'dm', dmId };
+        
+        // Show DM call button for DMs
+        if (dmCallBtn) {
+            dmCallBtn.classList.remove('hidden');
+        }
         
         // Update UI
         document.querySelectorAll('.server-item').forEach(item => item.classList.remove('active'));
@@ -2521,6 +2522,18 @@
                 return;
             }
             fileInput.click();
+        });
+    }
+    
+    // DM call button click
+    if (dmCallBtn) {
+        dmCallBtn.addEventListener('click', () => {
+            if (currentContext && currentContext.type === 'dm') {
+                const dm = dms.find(d => d.id === currentContext.dmId);
+                if (dm) {
+                    startVoiceCall(dm.username);
+                }
+            }
         });
     }
     
@@ -3237,6 +3250,11 @@
         channelsView.classList.add('hidden');
         friendsView.classList.remove('hidden');
         chatTitle.textContent = 'Friends';
+        
+        // Hide DM call button for friends view
+        if (dmCallBtn) {
+            dmCallBtn.classList.add('hidden');
+        }
         
         // Hide members sidebar for friends view
         rightSidebar.classList.add('hidden');
