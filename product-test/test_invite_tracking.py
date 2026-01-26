@@ -25,7 +25,6 @@ import sys
 import secrets
 import string
 import bcrypt
-from datetime import datetime
 
 # Set test encryption key before importing modules that need it
 if 'DECENTRA_ENCRYPTION_KEY' not in os.environ:
