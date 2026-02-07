@@ -23,10 +23,6 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
-nul
-
-# Claude Code
-.claude/
 
 # Logs
 *.log
@@ -55,5 +51,5 @@ frontend/.vite/
 agents/
 
 # License keys
-tools/license/keys/*.pem
+tools/license/keys/*_private_key.pem
 server/.license
